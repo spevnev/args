@@ -1,4 +1,4 @@
-// args v1.0.0
+// args v1.0.1
 // Documentation, examples, and issues: https://github.com/spevnev/args
 
 // MIT License
@@ -73,6 +73,12 @@ typedef struct {
     char **pos_args;
 } args;
 
+#if defined(__has_attribute) && __has_attribute(unused)
+#define ARGS_MAYBE_UNUSED __attribute__((unused))
+#else
+#define ARGS_MAYBE_UNUSED
+#endif
+
 #define ARGS_FATAL(...)               \
     do {                              \
         fprintf(stderr, "ERROR: ");   \
@@ -145,8 +151,8 @@ static void args_parse_value(args_option *option, const char *value) {
 // Defines a long option, returns a pointer set by `parse_args`.
 // Use '\0' for no short name.
 // Exits if `a` or `long_name` is NULL, or out of memory.
-static long *option_long(args *a, char short_name, const char *long_name, const char *description, bool is_optional,
-                         long default_value) {
+ARGS_MAYBE_UNUSED static long *option_long(args *a, char short_name, const char *long_name, const char *description,
+                                           bool is_optional, long default_value) {
     ARGS_ASSERT(a != NULL);
     args_option *option = args_new_option(a, short_name, long_name, description, is_optional);
     option->type = ARGS_TYPE_LONG;
@@ -157,8 +163,8 @@ static long *option_long(args *a, char short_name, const char *long_name, const 
 // Defines a float option, returns a pointer set by `parse_args`.
 // Use '\0' for no short name.
 // Exits if `a` or `long_name` is NULL, or out of memory.
-static float *option_float(args *a, char short_name, const char *long_name, const char *description, bool is_optional,
-                           float default_value) {
+ARGS_MAYBE_UNUSED static float *option_float(args *a, char short_name, const char *long_name, const char *description,
+                                             bool is_optional, float default_value) {
     ARGS_ASSERT(a != NULL);
     args_option *option = args_new_option(a, short_name, long_name, description, is_optional);
     option->type = ARGS_TYPE_FLOAT;
@@ -170,8 +176,8 @@ static float *option_float(args *a, char short_name, const char *long_name, cons
 // String memory is owned by library, freed by `free_args`.
 // Use '\0' for no short name.
 // Exits if `a` or `long_name` is NULL, or out of memory.
-static const char **option_str(args *a, char short_name, const char *long_name, const char *description,
-                               bool is_optional, const char *default_value) {
+ARGS_MAYBE_UNUSED static const char **option_str(args *a, char short_name, const char *long_name,
+                                                 const char *description, bool is_optional, const char *default_value) {
     ARGS_ASSERT(a != NULL);
     args_option *option = args_new_option(a, short_name, long_name, description, is_optional);
     option->type = ARGS_TYPE_STR;
@@ -182,7 +188,7 @@ static const char **option_str(args *a, char short_name, const char *long_name, 
 // Defines a boolean flag, returns a pointer set by `parse_args`.
 // Use '\0' for no short name.
 // Exits if `a` or `long_name` is NULL, or out of memory.
-static bool *option_flag(args *a, char short_name, const char *long_name, const char *description) {
+ARGS_MAYBE_UNUSED static bool *option_flag(args *a, char short_name, const char *long_name, const char *description) {
     ARGS_ASSERT(a != NULL);
     args_option *option = args_new_option(a, short_name, long_name, description, true);
     option->type = ARGS_TYPE_BOOL;
@@ -314,7 +320,7 @@ static int parse_args(args *a, int argc, char **argv, char ***pos_args) {
 }
 
 // Prints all options to `fp`. Caller is responsible for printing description, usage, etc.
-static void print_options(args *a, FILE *fp) {
+ARGS_MAYBE_UNUSED static void print_options(args *a, FILE *fp) {
     ARGS_ASSERT(a != NULL && fp != NULL);
 
     size_t longest_option = 0;
