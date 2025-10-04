@@ -1,0 +1,16 @@
+BasedOnStyle: Google
+ColumnLimit: 120
+IndentWidth: 4
+InsertNewlineAtEOF: true
+IncludeBlocks: Merge
+SpaceAfterCStyleCast: true
+BreakBeforeBinaryOperators: All
+BreakBeforeTernaryOperators: true
+AllowShortIfStatementsOnASingleLine: AllIfsAndElse
+AllowShortCaseLabelsOnASingleLine: true
+AlignConsecutiveShortCaseStatements:
+  Enabled: true
+AlignTrailingComments: true
+DerivePointerAlignment: false
+PointerAlignment: Right
+AlignArrayOfStructures: Left
