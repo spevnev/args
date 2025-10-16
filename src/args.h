@@ -1,4 +1,4 @@
-// args v1.0.1
+// args v1.1.0
 // Documentation, examples, and issues: https://github.com/spevnev/args
 
 // MIT License
@@ -148,6 +148,108 @@ static void args_parse_value(args_option *option, const char *value) {
     }
 }
 
+#ifndef ARGS_DISABLE_COMPLETION
+static void args_completion_bash_print(const char *program_name) {
+    ARGS_ASSERT(program_name != NULL);
+    printf(
+        "_%s() {\n"
+        "    local cur prev words cword\n"
+        "    _init_completion || return\n"
+        "\n"
+        "    if [[ $cur == -* ]]; then\n"
+        "        COMPREPLY=($(compgen -W \"$(%s __complete bash 2>/dev/null)\" -- \"$cur\"))\n"
+        "    fi\n"
+        "}\n"
+        "\n"
+        "complete -o default -F _%s %s\n",
+        program_name, program_name, program_name, program_name);
+}
+
+static void args_completion_zsh_print(const char *program_name) {
+    ARGS_ASSERT(program_name != NULL);
+    printf(
+        "#compdef %s\n"
+        "\n"
+        "_%s() {\n"
+        "    local IFS=$'\\n'\n"
+        "    _arguments $(%s __complete zsh 2>/dev/null)\n"
+        "}\n"
+        "\n"
+        "_%s\n",
+        program_name, program_name, program_name, program_name);
+}
+
+static void args_completion_fish_print(const char *program_name) {
+    ARGS_ASSERT(program_name != NULL);
+    printf(
+        "complete -c %s -e\n"
+        "\n"
+        "for args in (%s __complete fish 2>/dev/null)\n"
+        "    eval \"complete -c %s $args\"\n"
+        "end\n",
+        program_name, program_name, program_name);
+}
+
+static void args_completion_bash_complete(args *a) {
+    ARGS_ASSERT(a != NULL);
+    for (args_option *i = a->head; i != NULL; i = i->next) {
+        if (i->short_name != '\0') printf("-%c ", i->short_name);
+        printf("--%s ", i->long_name);
+    }
+    printf("\n");
+}
+
+static void args_completion_zsh_complete(args *a) {
+    ARGS_ASSERT(a != NULL);
+    for (args_option *i = a->head; i != NULL; i = i->next) {
+        if (i->short_name == '\0') {
+            printf("--%s=", i->long_name);
+            if (i->description != NULL) printf("[%s]", i->description);
+            printf("\n");
+        } else {
+            printf("(-%c --%s)-%c", i->short_name, i->long_name, i->short_name);
+            if (i->description != NULL) printf("[%s]", i->description);
+            printf("\n");
+
+            printf("(-%c --%s)--%s=", i->short_name, i->long_name, i->long_name);
+            if (i->description != NULL) printf("[%s]", i->description);
+            printf("\n");
+        }
+    }
+    printf("*:file:_files\n");
+}
+
+static void args_completion_fish_complete(args *a) {
+    ARGS_ASSERT(a != NULL);
+    for (args_option *i = a->head; i != NULL; i = i->next) {
+        printf("-l %s", i->long_name);
+        if (i->short_name != '\0') printf(" -s %c", i->short_name);
+        if (i->description != NULL) printf(" -d \"%s\"", i->description);
+        printf("\n");
+    }
+}
+#endif
+
+// Frees all the memory, including option values and array of positional arguments.
+static void free_args(args *a) {
+    if (a == NULL) return;
+
+    args_option *current = a->head;
+    while (current != NULL) {
+        args_option *next = current->next;
+        free(current->long_name);
+        free(current->description);
+        if (current->type == ARGS_TYPE_STR) free(current->value.str);
+        free(current);
+        current = next;
+    }
+    a->head = NULL;
+    a->tail = NULL;
+
+    free(a->pos_args);
+    a->pos_args = NULL;
+}
+
 // Defines a long option, returns a pointer set by `parse_args`.
 // Use '\0' for no short name.
 // Exits if `a` or `long_name` is NULL, or out of memory.
@@ -196,15 +298,18 @@ ARGS_MAYBE_UNUSED static bool *option_flag(args *a, char short_name, const char 
     return &option->value.bool_;
 }
 
-// Parses arguments and sets option-returned values.
-// Array of positional arguments is returned through `positional_args` and its length through return value.
-// Array elements point to `argv`, and the array memory is owned by library, freed by `free_args`.
-// Exist and prints to stderr on errors, should be called at the beginning of the `main`.
+// Parses arguments, sets option-returned values.
+// Unless disabled, handles shell completion by writing to stdout and exiting.
+// Must be called before side effects or stdout output.
+// Returns positional arguments via `pos_args`, and their count as return value.
+// Elements are from `argv`, while the array memory is managed by library.
+// On error, prints to stderr and exits.
 static int parse_args(args *a, int argc, char **argv, char ***pos_args) {
     ARGS_ASSERT(a != NULL && argv != NULL && pos_args != NULL);
 
     ARGS_ASSERT(argc >= 0);
-    if (argc == 0) ARGS_FATAL("The first argument is not a program name");
+    if (argc == 0) ARGS_FATAL("Expected the first argument to be a program name");
+    const char *program_name = argv[0];
     argc--;
     argv++;
 
@@ -218,6 +323,42 @@ static int parse_args(args *a, int argc, char **argv, char ***pos_args) {
             if (strcmp(i->long_name, j->long_name) == 0) ARGS_FATAL("Duplicate option \"%s\"", i->long_name);
         }
     }
+
+#ifdef ARGS_DISABLE_COMPLETION
+    (void) program_name;
+#else
+    if (argc >= 1 && strcmp(argv[0], "completion") == 0) {
+        if (argc == 1) ARGS_FATAL("Command 'completion' requires an argument: bash, zsh, fish");
+
+        if (strcmp(argv[1], "bash") == 0) {
+            args_completion_bash_print(program_name);
+        } else if (strcmp(argv[1], "zsh") == 0) {
+            args_completion_zsh_print(program_name);
+        } else if (strcmp(argv[1], "fish") == 0) {
+            args_completion_fish_print(program_name);
+        } else {
+            ARGS_FATAL("Failed to generate completion script: unknown shell \"%s\"", argv[1]);
+        }
+        free_args(a);
+        exit(EXIT_SUCCESS);
+    }
+
+    if (argc >= 1 && strcmp(argv[0], "__complete") == 0) {
+        if (argc == 1) ARGS_FATAL("Command '__complete' requires an argument: bash, zsh, fish");
+
+        if (strcmp(argv[1], "bash") == 0) {
+            args_completion_bash_complete(a);
+        } else if (strcmp(argv[1], "zsh") == 0) {
+            args_completion_zsh_complete(a);
+        } else if (strcmp(argv[1], "fish") == 0) {
+            args_completion_fish_complete(a);
+        } else {
+            ARGS_FATAL("Failed to generate completions: unknown shell \"%s\"", argv[1]);
+        }
+        free_args(a);
+        exit(EXIT_SUCCESS);
+    }
+#endif
 
     int pos_args_idx = 0;
     a->pos_args = malloc(sizeof(*argv) * argc);
@@ -319,7 +460,8 @@ static int parse_args(args *a, int argc, char **argv, char ***pos_args) {
     return pos_args_idx;
 }
 
-// Prints all options to `fp`. Caller is responsible for printing description, usage, etc.
+// Prints all options to `fp`.
+// Caller is responsible for printing usage, as well as `completion` command.
 ARGS_MAYBE_UNUSED static void print_options(args *a, FILE *fp) {
     ARGS_ASSERT(a != NULL && fp != NULL);
 
@@ -392,26 +534,6 @@ ARGS_MAYBE_UNUSED static void print_options(args *a, FILE *fp) {
         }
         fprintf(fp, "\n");
     }
-}
-
-// Frees all the memory, including option values and array of positional arguments.
-static void free_args(args *a) {
-    if (a == NULL) return;
-
-    args_option *current = a->head;
-    while (current != NULL) {
-        args_option *next = current->next;
-        free(current->long_name);
-        free(current->description);
-        if (current->type == ARGS_TYPE_STR) free(current->value.str);
-        free(current);
-        current = next;
-    }
-    a->head = NULL;
-    a->tail = NULL;
-
-    free(a->pos_args);
-    a->pos_args = NULL;
 }
 
 #undef ARGS_FATAL

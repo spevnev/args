@@ -11,8 +11,11 @@ int main(int argc, char **argv) {
     int pos_args_len = parse_args(&a, argc, argv, &pos_args);
 
     if (*help) {
-        printf("%s - Example of using args\n", argv[0]);
-        printf("Usage: %s [options]\n", argv[0]);
+        printf("%s - Example of using 'args' library\n", argv[0]);
+        printf("\n");
+        printf("Usage:\n");
+        printf("  %s [options]\n", argv[0]);
+        printf("  %s completion <bash|zsh|fish>\n", argv[0]);
         printf("\n");
         print_options(&a, stdout);
         free_args(&a);
