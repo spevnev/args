@@ -58,6 +58,7 @@ typedef struct args_option {
         ARGS_TYPE_LONG,
         ARGS_TYPE_FLOAT,
         ARGS_TYPE_STR,
+        ARGS_TYPE_PATH,
         ARGS_TYPE_BOOL,
     } type;
     struct {
@@ -173,7 +174,8 @@ static void args_parse_value(args_option *option, const char *value) {
             option->value.float_ = strtof(value, &end);
             if (end == NULL || *end != '\0') ARGS_FATAL("Invalid float \"%s\"", value);
         } break;
-        case ARGS_TYPE_STR:  option->value.str = args_strdup(value); break;
+        case ARGS_TYPE_STR:
+        case ARGS_TYPE_PATH: option->value.str = args_strdup(value); break;
         case ARGS_TYPE_BOOL: ARGS_UNREACHABLE(); break;
     }
 }
@@ -250,12 +252,15 @@ static void args_completion_zsh_complete(args *a) {
             description = buffer;
         }
 
-        if (i->short_name == '\0') {
-            printf("--%s=%s\n", i->long_name, description);
-        } else {
+        if (i->short_name != '\0') {
             printf("(-%c --%s)-%c%s\n", i->short_name, i->long_name, i->short_name, description);
-            printf("(-%c --%s)--%s=%s\n", i->short_name, i->long_name, i->long_name, description);
+            printf("(-%c --%s)", i->short_name, i->long_name);
         }
+        printf("--%s", i->long_name);
+        if (i->type != ARGS_TYPE_BOOL) printf("=");
+        printf("%s", description);
+        if (i->type == ARGS_TYPE_PATH) printf(":path:_files");
+        printf("\n");
     }
     printf("*:file:_files\n");
     free(buffer);
@@ -268,8 +273,8 @@ static void args_completion_fish_complete(args *a) {
     char *buffer = malloc(a->max_descr_len * 2 + 1);
     if (buffer == NULL) ARGS_OUT_OF_MEMORY();
     for (args_option *i = a->head; i != NULL; i = i->next) {
-        printf("-l %s", i->long_name);
-        if (i->short_name != '\0') printf(" -s %c", i->short_name);
+        printf("-l %s -%c", i->long_name, i->type == ARGS_TYPE_PATH ? 'F' : 'f');
+        if (i->short_name != '\0') printf(" -s %c -r", i->short_name);
         if (i->description != NULL) {
             // Escape '$', '"' and '\'.
             char *c = buffer;
@@ -296,7 +301,7 @@ static void free_args(args *a) {
         args_option *next = current->next;
         free(current->long_name);
         free(current->description);
-        if (current->type == ARGS_TYPE_STR) free(current->value.str);
+        if (current->type == ARGS_TYPE_STR || current->type == ARGS_TYPE_PATH) free(current->value.str);
         free(current);
         current = next;
     }
@@ -343,6 +348,19 @@ ARGS_MAYBE_UNUSED ARGS_WARN_UNUSED_RESULT static const char **option_str(args *a
     ARGS_ASSERT(a != NULL);
     args_option *option = args_new_option(a, short_name, long_name, description, is_optional);
     option->type = ARGS_TYPE_STR;
+    option->value.str = default_value == NULL ? NULL : args_strdup(default_value);
+    return (const char **) &option->value.str;
+}
+
+// Same as `option_str` except that shell completion will suggest paths.
+// Does NOT check that the value is a path.
+ARGS_MAYBE_UNUSED ARGS_WARN_UNUSED_RESULT static const char **option_path(args *a, char short_name,
+                                                                          const char *long_name,
+                                                                          const char *description, bool is_optional,
+                                                                          const char *default_value) {
+    ARGS_ASSERT(a != NULL);
+    args_option *option = args_new_option(a, short_name, long_name, description, is_optional);
+    option->type = ARGS_TYPE_PATH;
     option->value.str = default_value == NULL ? NULL : args_strdup(default_value);
     return (const char **) &option->value.str;
 }
@@ -589,6 +607,7 @@ ARGS_MAYBE_UNUSED static void print_options(args *a, FILE *fp) {
                 case ARGS_TYPE_LONG:  fprintf(fp, "%ld", option->value.long_); break;
                 case ARGS_TYPE_FLOAT: fprintf(fp, "%.3f", option->value.float_); break;
                 case ARGS_TYPE_STR:
+                case ARGS_TYPE_PATH:
                     if (option->value.str == NULL) {
                         fprintf(fp, "none");
                     } else {
