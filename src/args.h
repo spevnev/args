@@ -29,6 +29,7 @@
 #define ARGS_H_
 #endif
 
+#include <ctype.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -71,6 +72,7 @@ typedef struct {
     args_option *head;
     args_option *tail;
     char **pos_args;
+    size_t max_descr_len;
 } args;
 
 #if defined(__has_attribute) && __has_attribute(unused)
@@ -110,7 +112,29 @@ static char *args_strdup(const char *str) {
 static args_option *args_new_option(args *a, char short_name, const char *long_name, const char *description,
                                     bool is_optional) {
     ARGS_ASSERT(a != NULL);
+
+    if (short_name != '\0' && !isalnum(short_name)) {
+        ARGS_FATAL("Invalid short name '%c'. It must be alphanumeric", short_name);
+    }
+
     if (long_name == NULL) ARGS_FATAL("Option must have a long name");
+    for (const char *c = long_name; *c != '\0'; c++) {
+        if (isalnum(*c) || *c == '_' || *c == '+') continue;
+        if (*c == '-' && c != long_name) continue;
+        ARGS_FATAL("Invalid long name \"%s\". It must consist of alphanumerics and \"-_+\", cannot start with '-'",
+                   long_name);
+    }
+
+    if (description != NULL) {
+        for (const char *c = description; *c != '\0'; c++) {
+            if (*c == '\n') ARGS_FATAL("Description must not contain newlines. It will be split automatically");
+            if (*c == '\t') ARGS_FATAL("Description must not contain tabs to maintain proper length");
+            if (!isprint(*c)) ARGS_FATAL("Description of \"%s\" contains an unprintable character '%c'", long_name, *c);
+        }
+
+        size_t length = strlen(description);
+        if (length > a->max_descr_len) a->max_descr_len = length;
+    }
 
     args_option *option = (args_option *) malloc(sizeof(*option));
     if (option == NULL) ARGS_OUT_OF_MEMORY();
@@ -201,32 +225,59 @@ static void args_completion_bash_complete(args *a) {
 
 static void args_completion_zsh_complete(args *a) {
     ARGS_ASSERT(a != NULL);
-    for (args_option *i = a->head; i != NULL; i = i->next) {
-        if (i->short_name == '\0') {
-            printf("--%s=", i->long_name);
-            if (i->description != NULL) printf("[%s]", i->description);
-            printf("\n");
-        } else {
-            printf("(-%c --%s)-%c", i->short_name, i->long_name, i->short_name);
-            if (i->description != NULL) printf("[%s]", i->description);
-            printf("\n");
 
-            printf("(-%c --%s)--%s=", i->short_name, i->long_name, i->long_name);
-            if (i->description != NULL) printf("[%s]", i->description);
-            printf("\n");
+    // Double the size in the extreme case that description consists entirely of escaped characters.
+    char *buffer = malloc(a->max_descr_len * 2 + 1);
+    if (buffer == NULL) ARGS_OUT_OF_MEMORY();
+    for (args_option *i = a->head; i != NULL; i = i->next) {
+        const char *description = "";
+        if (i->description != NULL) {
+            // Escape ']' and '\' in description, and wrap in square brackets as format requires.
+            char *c = buffer;
+            *c++ = '[';
+            for (char *j = i->description; *j != '\0'; j++) {
+                if (*j == ']' || *j == '\\') *c++ = '\\';
+                *c++ = *j;
+            }
+            *c++ = ']';
+            *c++ = '\0';
+            description = buffer;
+        }
+
+        if (i->short_name == '\0') {
+            printf("--%s=%s\n", i->long_name, description);
+        } else {
+            printf("(-%c --%s)-%c%s\n", i->short_name, i->long_name, i->short_name, description);
+            printf("(-%c --%s)--%s=%s\n", i->short_name, i->long_name, i->long_name, description);
         }
     }
     printf("*:file:_files\n");
+    free(buffer);
 }
 
 static void args_completion_fish_complete(args *a) {
     ARGS_ASSERT(a != NULL);
+
+    // Double the size in the extreme case that description consists entirely of escaped characters.
+    char *buffer = malloc(a->max_descr_len * 2 + 1);
+    if (buffer == NULL) ARGS_OUT_OF_MEMORY();
     for (args_option *i = a->head; i != NULL; i = i->next) {
         printf("-l %s", i->long_name);
         if (i->short_name != '\0') printf(" -s %c", i->short_name);
-        if (i->description != NULL) printf(" -d \"%s\"", i->description);
+        if (i->description != NULL) {
+            // Escape '$', '"' and '\'.
+            char *c = buffer;
+            for (char *j = i->description; *j != '\0'; j++) {
+                if (*j == '$' || *j == '"' || *j == '\\') *c++ = '\\';
+                *c++ = *j;
+            }
+            *c++ = '\0';
+
+            printf(" -d \"%s\"", buffer);
+        }
         printf("\n");
     }
+    free(buffer);
 }
 #endif
 
@@ -329,6 +380,12 @@ static int parse_args(args *a, int argc, char **argv, char ***pos_args) {
 #else
     if (argc >= 1 && strcmp(argv[0], "completion") == 0) {
         if (argc == 1) ARGS_FATAL("Command 'completion' requires an argument: bash, zsh, fish");
+
+        for (const char *c = program_name; *c != '\0'; c++) {
+            if (isalnum(*c) || *c == '_' || *c == '.' || *c == '+' || *c == ':') continue;
+            if (*c == '-' && c != program_name) continue;
+            ARGS_FATAL("Invalid program name \"%s\"", program_name);
+        }
 
         if (strcmp(argv[1], "bash") == 0) {
             args_completion_bash_print(program_name);
