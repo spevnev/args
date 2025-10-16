@@ -81,6 +81,12 @@ typedef struct {
 #define ARGS_MAYBE_UNUSED
 #endif
 
+#if defined(__has_attribute) && __has_attribute(warn_unused_result)
+#define ARGS_WARN_UNUSED_RESULT __attribute__((warn_unused_result))
+#else
+#define ARGS_WARN_UNUSED_RESULT
+#endif
+
 #define ARGS_FATAL(...)               \
     do {                              \
         fprintf(stderr, "ERROR: ");   \
@@ -304,8 +310,9 @@ static void free_args(args *a) {
 // Defines a long option, returns a pointer set by `parse_args`.
 // Use '\0' for no short name.
 // Exits if `a` or `long_name` is NULL, or out of memory.
-ARGS_MAYBE_UNUSED static long *option_long(args *a, char short_name, const char *long_name, const char *description,
-                                           bool is_optional, long default_value) {
+ARGS_MAYBE_UNUSED ARGS_WARN_UNUSED_RESULT static long *option_long(args *a, char short_name, const char *long_name,
+                                                                   const char *description, bool is_optional,
+                                                                   long default_value) {
     ARGS_ASSERT(a != NULL);
     args_option *option = args_new_option(a, short_name, long_name, description, is_optional);
     option->type = ARGS_TYPE_LONG;
@@ -316,8 +323,9 @@ ARGS_MAYBE_UNUSED static long *option_long(args *a, char short_name, const char 
 // Defines a float option, returns a pointer set by `parse_args`.
 // Use '\0' for no short name.
 // Exits if `a` or `long_name` is NULL, or out of memory.
-ARGS_MAYBE_UNUSED static float *option_float(args *a, char short_name, const char *long_name, const char *description,
-                                             bool is_optional, float default_value) {
+ARGS_MAYBE_UNUSED ARGS_WARN_UNUSED_RESULT static float *option_float(args *a, char short_name, const char *long_name,
+                                                                     const char *description, bool is_optional,
+                                                                     float default_value) {
     ARGS_ASSERT(a != NULL);
     args_option *option = args_new_option(a, short_name, long_name, description, is_optional);
     option->type = ARGS_TYPE_FLOAT;
@@ -329,8 +337,9 @@ ARGS_MAYBE_UNUSED static float *option_float(args *a, char short_name, const cha
 // String memory is owned by library, freed by `free_args`.
 // Use '\0' for no short name.
 // Exits if `a` or `long_name` is NULL, or out of memory.
-ARGS_MAYBE_UNUSED static const char **option_str(args *a, char short_name, const char *long_name,
-                                                 const char *description, bool is_optional, const char *default_value) {
+ARGS_MAYBE_UNUSED ARGS_WARN_UNUSED_RESULT static const char **option_str(args *a, char short_name,
+                                                                         const char *long_name, const char *description,
+                                                                         bool is_optional, const char *default_value) {
     ARGS_ASSERT(a != NULL);
     args_option *option = args_new_option(a, short_name, long_name, description, is_optional);
     option->type = ARGS_TYPE_STR;
@@ -341,7 +350,8 @@ ARGS_MAYBE_UNUSED static const char **option_str(args *a, char short_name, const
 // Defines a boolean flag, returns a pointer set by `parse_args`.
 // Use '\0' for no short name.
 // Exits if `a` or `long_name` is NULL, or out of memory.
-ARGS_MAYBE_UNUSED static bool *option_flag(args *a, char short_name, const char *long_name, const char *description) {
+ARGS_MAYBE_UNUSED ARGS_WARN_UNUSED_RESULT static bool *option_flag(args *a, char short_name, const char *long_name,
+                                                                   const char *description) {
     ARGS_ASSERT(a != NULL);
     args_option *option = args_new_option(a, short_name, long_name, description, true);
     option->type = ARGS_TYPE_BOOL;
@@ -593,6 +603,8 @@ ARGS_MAYBE_UNUSED static void print_options(args *a, FILE *fp) {
     }
 }
 
+#undef ARGS_MAYBE_UNUSED
+#undef ARGS_WARN_UNUSED_RESULT
 #undef ARGS_FATAL
 #undef ARGS_OUT_OF_MEMORY
 #undef ARGS_UNREACHABLE
