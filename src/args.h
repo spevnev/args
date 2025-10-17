@@ -393,7 +393,7 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static bool *option_flag(args *a, ch
 // Elements are from `argv`, while the array memory is managed by library.
 // On error, prints to stderr and exits.
 static int parse_args(args *a, int argc, char **argv, char ***pos_args) {
-    ARGS__ASSERT(a != NULL && argv != NULL && pos_args != NULL);
+    ARGS__ASSERT(a != NULL && argv != NULL);
 
     ARGS__ASSERT(argc >= 0);
     if (argc == 0) ARGS__FATAL("Expected the first argument to be a program name");
@@ -455,9 +455,11 @@ static int parse_args(args *a, int argc, char **argv, char ***pos_args) {
 #endif
 
     int pos_args_idx = 0;
-    a->pos_args = malloc(sizeof(*argv) * argc);
-    if (a->pos_args == NULL) ARGS__OUT_OF_MEMORY();
-    *pos_args = a->pos_args;
+    if (pos_args != NULL) {
+        a->pos_args = malloc(sizeof(*argv) * argc);
+        if (a->pos_args == NULL) ARGS__OUT_OF_MEMORY();
+        *pos_args = a->pos_args;
+    }
 
     while (argc > 0) {
         char *arg = *argv;
@@ -466,7 +468,7 @@ static int parse_args(args *a, int argc, char **argv, char ***pos_args) {
         argv++;
 
         if (arg_len < 2 || arg[0] != '-') {
-            (*pos_args)[pos_args_idx++] = arg;
+            if (pos_args != NULL) (*pos_args)[pos_args_idx++] = arg;
             continue;
         }
 
@@ -513,10 +515,10 @@ static int parse_args(args *a, int argc, char **argv, char ***pos_args) {
 
             args__parse_value(option, value);
         } else {
+            if (arg_len != 2) ARGS__FATAL("Short option must be separate: \"%s\"", arg);
+
             arg += 1;
             arg_len -= 1;
-
-            if (arg_len != 1) ARGS__FATAL("Short option must be separate");
             char ch = *arg;
 
             args_option *option = a->head;
@@ -602,11 +604,13 @@ ARGS__MAYBE_UNUSED static void print_options(args *a, FILE *fp) {
             }
             fprintf(fp, "%s", cur);
 
-            if (is_multiline) {
-                // Print description on the new line to avoid breaking it too.
-                fprintf(fp, "\n%*c", offset, ' ');
-            } else {
-                fprintf(fp, " ");
+            if (option->is_optional) {
+                if (is_multiline) {
+                    // Print description on the new line to avoid breaking it too.
+                    fprintf(fp, "\n%*c", offset, ' ');
+                } else {
+                    fprintf(fp, " ");
+                }
             }
         }
 
