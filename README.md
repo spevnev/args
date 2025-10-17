@@ -1,6 +1,19 @@
 # args
 *args* is a simple single-header library for parsing command-line arguments in C.
 
+
+### Shell completion
+
+Supported shells: bash, zsh, fish.
+
+Scripts should be installed through the build system, package manager, or explicitly by user. \
+For system-wide installation:
+```shell
+PROGRAM_NAME completion bash > /usr/share/bash-completion/completions/PROGRAM_NAME
+PROGRAM_NAME completion zsh > /usr/share/zsh/site-functions/_PROGRAM_NAME
+PROGRAM_NAME completion fish > /usr/share/fish/vendor_completions.d/PROGRAM_NAME.fish
+```
+
 ## Example
 ```c
 // examples/example.c
@@ -9,23 +22,34 @@
 int main(int argc, char **argv) {
     args a = {0};
     bool *help = option_flag(&a, 'h', "help", "Show help");
+    bool *version = option_flag(&a, 'v', "version", "Print version");
     long *l = option_long(&a, 'l', "long", "A long option", true, 0);
     float *f = option_float(&a, 'f', "float", "A float option", true, 0.0F);
     const char **s = option_str(&a, 's', "str", "A string option", true, NULL);
+    const char **p = option_path(&a, 'p', "path", "A path option", true, NULL);
 
     char **pos_args;
     int pos_args_len = parse_args(&a, argc, argv, &pos_args);
 
-    if (*help) {
-        printf("%s - Example of using args\n", argv[0]);
-        printf("Usage: %s [options]\n", argv[0]);
+    if (*help || (pos_args_len == 1 && strcmp(pos_args[0], "help") == 0)) {
+        printf("%s - Example of using 'args' library\n", argv[0]);
+        printf("\n");
+        printf("Usage:\n");
+        printf("  %s [options]\n", argv[0]);
+        printf("  %s completion <bash|zsh|fish>\n", argv[0]);
         printf("\n");
         print_options(&a, stdout);
         free_args(&a);
         return EXIT_SUCCESS;
     }
 
-    printf("options: l=%ld f=%f s=%s\n", *l, *f, *s);
+    if (*version || (pos_args_len == 1 && strcmp(pos_args[0], "version") == 0)) {
+        printf("v1.1.0\n");
+        free_args(&a);
+        return EXIT_SUCCESS;
+    }
+
+    printf("options: l=%ld f=%f s=%s p=%s\n", *l, *f, *s, *p);
 
     printf("positional arguments:");
     for (int i = 0; i < pos_args_len; i++) printf(" %s", pos_args[i]);
@@ -40,6 +64,7 @@ int main(int argc, char **argv) {
 
 option | description | default
 -|-|-
+`ARGS_DISABLE_COMPLETION` | Disable shell completion | not defined
 `ARGS_SKIP_UNKNOWN` | Skip unknown options, otherwise it is an error | not defined
 `ARGS_ALLOW_OVERWRITING` | Allow overwriting option, otherwise it is an error | not defined
 `ARGS_PADDING` | The number of spaces between the option name and its description | 2
