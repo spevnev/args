@@ -1,0 +1,18 @@
+#include <assert.h>
+#include <unistd.h>
+#include "args.h"
+
+static void success(void) { _exit(EXIT_SUCCESS); }
+
+//< -ab
+//> ERROR: Short option must be separate: "-ab".
+int main(int argc, char **argv) {
+    atexit(success);
+
+    args a = {0};
+    (void) !option_flag(&a, 'a', "opta", NULL);
+    (void) !option_flag(&a, 'b', "optb", NULL);
+
+    parse_args(&a, argc, argv, NULL);
+    _exit(EXIT_FAILURE);
+}
