@@ -120,6 +120,18 @@ static char *args__strdup(const char *str) {
     return dup;
 }
 
+static const char *args__basename(const char *path) {
+    ARGS__ASSERT(path != NULL);
+
+    const char *filename = strrchr(path, '/');
+#ifdef _WIN32
+    const char *win_filename = strrchr(path, '\\');
+    // Windows can use either slash, take the last one.
+    if (filename == NULL || (win_filename != NULL && win_filename > filename)) filename = win_filename;
+#endif
+    return filename == NULL ? path : filename + 1;
+}
+
 static args_option *args__new_option(args *a, char short_name, const char *long_name, const char *description,
                                      bool is_optional) {
     ARGS__ASSERT(a != NULL);
@@ -397,7 +409,7 @@ static int parse_args(args *a, int argc, char **argv, char ***pos_args) {
 
     ARGS__ASSERT(argc >= 0);
     if (argc == 0) ARGS__FATAL("Expected the first argument to be a program name");
-    const char *program_name = argv[0];
+    const char *program_name = args__basename(argv[0]);
     argc--;
     argv++;
 
