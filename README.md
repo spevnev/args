@@ -1,7 +1,9 @@
 # args
-*args* is a simple single-header library for parsing command-line arguments in C.
+
+_args_ is a simple single-header library for parsing command-line arguments in C.
 
 ## Example & Usage
+
 ```c
 // examples/example.c
 #include "args.h"
@@ -68,6 +70,7 @@ Supported shells: bash, zsh, fish.
 
 Scripts should be installed through the build system, package manager, or explicitly by user. \
 For system-wide installation:
+
 ```shell
 PROGRAM_NAME completion bash > /usr/share/bash-completion/completions/PROGRAM_NAME
 PROGRAM_NAME completion zsh > /usr/share/zsh/site-functions/_PROGRAM_NAME
@@ -76,11 +79,12 @@ PROGRAM_NAME completion fish > /usr/share/fish/vendor_completions.d/PROGRAM_NAME
 
 ## Library options
 
-option | description | default
--|-|-
-`ARGS_DISABLE_COMPLETION` | Disable shell completion | not defined
-`ARGS_SKIP_UNKNOWN` | Skip unknown options, otherwise it is an error | not defined
-`ARGS_ALLOW_OVERWRITING` | Allow overwriting option, otherwise it is an error | not defined
-`ARGS_PADDING` | The number of spaces between the option name and its description | 2
-`ARGS_LINE_LENGTH` | Line length | 80
-`ARGS_MIN_DESC_LENGTH` | Minimum length of the description line, ignoring the line length | 30
+| option                    | description                                                      | default     |
+| ------------------------- | ---------------------------------------------------------------- | ----------- |
+| `ARGS_DISABLE_COMPLETION` | Disable shell completion                                         | not defined |
+| `ARGS_SKIP_UNKNOWN`       | Skip unknown options, otherwise it is an error                   | not defined |
+| `ARGS_ALLOW_OVERWRITING`  | Allow overwriting option, otherwise it is an error               | not defined |
+| `ARGS_PADDING`            | The number of spaces between the option name and its description | 2           |
+| `ARGS_LINE_LENGTH`        | Line length                                                      | 80          |
+| `ARGS_MIN_DESC_LENGTH`    | Minimum length of the description line, ignoring the line length | 30          |
+| `ARGS_HIDE_DEFAULTS`      | Hides default values when printing options                       | not defined |

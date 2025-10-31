@@ -2,7 +2,7 @@
 
 int main(int argc, char **argv) {
     // Zero-initialize library state.
-    args a = {0};
+    Args a = {0};
 
     // Define options.
     bool *help = option_flag(&a, 'h', "help", "Show help");

@@ -5,7 +5,7 @@
 
 //< --unknown --opt 1
 int main(int argc, char **argv) {
-    args a = {0};
+    Args a = {0};
     long *opt = option_long(&a, 'o', "opt", NULL, true, 0);
 
     char **pos_args;

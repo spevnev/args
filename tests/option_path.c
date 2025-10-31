@@ -3,7 +3,7 @@
 
 //< --long1 first --long2=second -s third
 int main(int argc, char **argv) {
-    args a = {0};
+    Args a = {0};
     const char **l1 = option_path(&a, '\0', "long1", NULL, false, NULL);
     const char **l2 = option_path(&a, '\0', "long2", NULL, false, NULL);
     const char **s = option_path(&a, 's', "long3", NULL, false, NULL);
