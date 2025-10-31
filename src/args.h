@@ -640,14 +640,18 @@ ARGS__MAYBE_UNUSED static void print_options(Args *a, FILE *fp) {
                 // Find the closest space to break the line.
                 int chunk_length = line_length;
                 while (chunk_length > 0 && cur[chunk_length] != ' ') chunk_length--;
+
                 // If failed to find a space or it is too early, break mid-word.
                 if (chunk_length < line_length / 2) chunk_length = line_length;
 
                 fprintf(fp, "%.*s\n%*c", chunk_length, cur, offset, ' ');
 
-                // Advance by one more to skip the space.
-                cur += chunk_length + 1;
-                length -= chunk_length + 1;
+                if (cur[chunk_length] == ' ') {
+                    cur++;
+                    length--;
+                }
+                cur += chunk_length;
+                length -= chunk_length;
             }
             fprintf(fp, "%s", cur);
         }
