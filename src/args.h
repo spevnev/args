@@ -599,7 +599,7 @@ ARGS__MAYBE_UNUSED static void print_options(Args *a, FILE *fp) {
             int line_length = ARGS_LINE_LENGTH - offset;
             if (line_length < ARGS_MIN_DESC_LENGTH) line_length = ARGS_MIN_DESC_LENGTH;
             int length = strlen(option->description);
-            bool is_multiline = length > line_length;
+            ARGS__MAYBE_UNUSED bool is_multiline = length > line_length;
             char *cur = option->description;
             while (length > line_length) {
                 // Find the closest space to break the line.
@@ -625,8 +625,10 @@ ARGS__MAYBE_UNUSED static void print_options(Args *a, FILE *fp) {
                     fprintf(fp, " ");
                 }
             }
+#endif
         }
 
+#ifndef ARGS_HIDE_DEFAULTS
         if (option->is_optional) {
             fprintf(fp, "(default: ");
             switch (option->type) {
