@@ -110,7 +110,7 @@ typedef struct {
         }                                                                               \
     } while (0)
 
-static char *args__strdup(const char *str) {
+static char *Args__strdup(const char *str) {
     ARGS__ASSERT(str != NULL);
     size_t len = strlen(str);
     char *dup = malloc(len + 1);
@@ -120,7 +120,7 @@ static char *args__strdup(const char *str) {
     return dup;
 }
 
-static const char *args__basename(const char *path) {
+static const char *Args__basename(const char *path) {
     ARGS__ASSERT(path != NULL);
 
     const char *filename = strrchr(path, '/');
@@ -132,7 +132,7 @@ static const char *args__basename(const char *path) {
     return filename == NULL ? path : filename + 1;
 }
 
-static Args__Option *args__new_option(Args *a, char short_name, const char *long_name, const char *description,
+static Args__Option *Args__new_option(Args *a, char short_name, const char *long_name, const char *description,
                                       bool is_optional) {
     ARGS__ASSERT(a != NULL);
 
@@ -163,8 +163,8 @@ static Args__Option *args__new_option(Args *a, char short_name, const char *long
     if (option == NULL) ARGS__OUT_OF_MEMORY();
     option->next = NULL;
     option->short_name = short_name;
-    option->long_name = args__strdup(long_name);
-    option->description = description == NULL ? NULL : args__strdup(description);
+    option->long_name = Args__strdup(long_name);
+    option->description = description == NULL ? NULL : Args__strdup(description);
     option->is_optional = is_optional;
     option->is_set = false;
 
@@ -177,7 +177,7 @@ static Args__Option *args__new_option(Args *a, char short_name, const char *long
     return option;
 }
 
-static void args__parse_value(Args__Option *option, const char *value) {
+static void Args__parse_value(Args__Option *option, const char *value) {
     ARGS__ASSERT(option != NULL && value != NULL);
     switch (option->type) {
         case ARGS__TYPE_LONG: {
@@ -191,13 +191,13 @@ static void args__parse_value(Args__Option *option, const char *value) {
             if (end == NULL || *end != '\0') ARGS__FATAL("Invalid float \"%s\"", value);
         } break;
         case ARGS__TYPE_STR:
-        case ARGS__TYPE_PATH: option->value.str = args__strdup(value); break;
+        case ARGS__TYPE_PATH: option->value.str = Args__strdup(value); break;
         case ARGS__TYPE_BOOL: ARGS__UNREACHABLE(); break;
     }
 }
 
 #ifndef ARGS_DISABLE_COMPLETION
-static void args__completion_bash_print(const char *program_name) {
+static void Args__completion_bash_print(const char *program_name) {
     ARGS__ASSERT(program_name != NULL);
     printf(
         "_%s() {\n"
@@ -213,7 +213,7 @@ static void args__completion_bash_print(const char *program_name) {
         program_name, program_name, program_name, program_name);
 }
 
-static void args__completion_zsh_print(const char *program_name) {
+static void Args__completion_zsh_print(const char *program_name) {
     ARGS__ASSERT(program_name != NULL);
     printf(
         "#compdef %s\n"
@@ -227,7 +227,7 @@ static void args__completion_zsh_print(const char *program_name) {
         program_name, program_name, program_name, program_name);
 }
 
-static void args__completion_fish_print(const char *program_name) {
+static void Args__completion_fish_print(const char *program_name) {
     ARGS__ASSERT(program_name != NULL);
     printf(
         "complete -c %s -e\n"
@@ -238,7 +238,7 @@ static void args__completion_fish_print(const char *program_name) {
         program_name, program_name, program_name);
 }
 
-static void args__completion_bash_complete(Args *a) {
+static void Args__completion_bash_complete(Args *a) {
     ARGS__ASSERT(a != NULL);
     for (Args__Option *i = a->head; i != NULL; i = i->next) {
         if (i->short_name != '\0') printf("-%c ", i->short_name);
@@ -247,7 +247,7 @@ static void args__completion_bash_complete(Args *a) {
     printf("\n");
 }
 
-static void args__completion_zsh_complete(Args *a) {
+static void Args__completion_zsh_complete(Args *a) {
     ARGS__ASSERT(a != NULL);
 
     // Double the size in the extreme case that description consists entirely of escaped characters.
@@ -282,7 +282,7 @@ static void args__completion_zsh_complete(Args *a) {
     free(buffer);
 }
 
-static void args__completion_fish_complete(Args *a) {
+static void Args__completion_fish_complete(Args *a) {
     ARGS__ASSERT(a != NULL);
 
     // Double the size in the extreme case that description consists entirely of escaped characters.
@@ -339,7 +339,7 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static long *option_long(Args *a, ch
                                                                      const char *description, bool is_optional,
                                                                      long default_value) {
     ARGS__ASSERT(a != NULL);
-    Args__Option *option = args__new_option(a, short_name, long_name, description, is_optional);
+    Args__Option *option = Args__new_option(a, short_name, long_name, description, is_optional);
     option->type = ARGS__TYPE_LONG;
     option->value.long_ = default_value;
     return &option->value.long_;
@@ -352,7 +352,7 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static float *option_float(Args *a, 
                                                                        const char *description, bool is_optional,
                                                                        float default_value) {
     ARGS__ASSERT(a != NULL);
-    Args__Option *option = args__new_option(a, short_name, long_name, description, is_optional);
+    Args__Option *option = Args__new_option(a, short_name, long_name, description, is_optional);
     option->type = ARGS__TYPE_FLOAT;
     option->value.float_ = default_value;
     return &option->value.float_;
@@ -367,9 +367,9 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const char **option_str(Args 
                                                                            const char *description, bool is_optional,
                                                                            const char *default_value) {
     ARGS__ASSERT(a != NULL);
-    Args__Option *option = args__new_option(a, short_name, long_name, description, is_optional);
+    Args__Option *option = Args__new_option(a, short_name, long_name, description, is_optional);
     option->type = ARGS__TYPE_STR;
-    option->value.str = default_value == NULL ? NULL : args__strdup(default_value);
+    option->value.str = default_value == NULL ? NULL : Args__strdup(default_value);
     return (const char **) &option->value.str;
 }
 
@@ -380,9 +380,9 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const char **option_path(Args
                                                                             const char *description, bool is_optional,
                                                                             const char *default_value) {
     ARGS__ASSERT(a != NULL);
-    Args__Option *option = args__new_option(a, short_name, long_name, description, is_optional);
+    Args__Option *option = Args__new_option(a, short_name, long_name, description, is_optional);
     option->type = ARGS__TYPE_PATH;
-    option->value.str = default_value == NULL ? NULL : args__strdup(default_value);
+    option->value.str = default_value == NULL ? NULL : Args__strdup(default_value);
     return (const char **) &option->value.str;
 }
 
@@ -392,7 +392,7 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const char **option_path(Args
 ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static bool *option_flag(Args *a, char short_name, const char *long_name,
                                                                      const char *description) {
     ARGS__ASSERT(a != NULL);
-    Args__Option *option = args__new_option(a, short_name, long_name, description, true);
+    Args__Option *option = Args__new_option(a, short_name, long_name, description, true);
     option->type = ARGS__TYPE_BOOL;
     option->value.bool_ = false;
     return &option->value.bool_;
@@ -409,7 +409,7 @@ static int parse_args(Args *a, int argc, char **argv, char ***pos_args) {
 
     ARGS__ASSERT(argc >= 0);
     if (argc == 0) ARGS__FATAL("Expected the first argument to be a program name");
-    const char *program_name = args__basename(argv[0]);
+    const char *program_name = Args__basename(argv[0]);
     argc--;
     argv++;
 
@@ -437,11 +437,11 @@ static int parse_args(Args *a, int argc, char **argv, char ***pos_args) {
         }
 
         if (strcmp(argv[1], "bash") == 0) {
-            args__completion_bash_print(program_name);
+            Args__completion_bash_print(program_name);
         } else if (strcmp(argv[1], "zsh") == 0) {
-            args__completion_zsh_print(program_name);
+            Args__completion_zsh_print(program_name);
         } else if (strcmp(argv[1], "fish") == 0) {
-            args__completion_fish_print(program_name);
+            Args__completion_fish_print(program_name);
         } else {
             ARGS__FATAL("Failed to generate completion script: unknown shell \"%s\"", argv[1]);
         }
@@ -453,11 +453,11 @@ static int parse_args(Args *a, int argc, char **argv, char ***pos_args) {
         if (argc == 1) ARGS__FATAL("Command '__complete' requires an argument: bash, zsh, fish");
 
         if (strcmp(argv[1], "bash") == 0) {
-            args__completion_bash_complete(a);
+            Args__completion_bash_complete(a);
         } else if (strcmp(argv[1], "zsh") == 0) {
-            args__completion_zsh_complete(a);
+            Args__completion_zsh_complete(a);
         } else if (strcmp(argv[1], "fish") == 0) {
-            args__completion_fish_complete(a);
+            Args__completion_fish_complete(a);
         } else {
             ARGS__FATAL("Failed to generate completions: unknown shell \"%s\"", argv[1]);
         }
@@ -525,7 +525,7 @@ static int parse_args(Args *a, int argc, char **argv, char ***pos_args) {
                 argv++;
             }
 
-            args__parse_value(option, value);
+            Args__parse_value(option, value);
         } else {
             if (arg_len != 2) ARGS__FATAL("Short option must be separate: \"%s\"", arg);
 
@@ -557,7 +557,7 @@ static int parse_args(Args *a, int argc, char **argv, char ***pos_args) {
             argc--;
             argv++;
 
-            args__parse_value(option, value);
+            Args__parse_value(option, value);
         }
     }
 
