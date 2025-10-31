@@ -19,7 +19,6 @@ int main(int argc, char **argv) {
     (void) !option_path(&a, 'p', "path", "A path option", true, NULL);
 
     parse_args(&a, argc, argv, NULL);
-
     print_options(&a, stdout);
 
     free_args(&a);
