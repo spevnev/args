@@ -1,6 +1,6 @@
 # args
 
-_args_ is a simple single-header library for parsing command-line arguments in C.
+*args* is a simple single-header library for parsing command-line arguments in C.
 
 ## Example & Usage
 
@@ -10,7 +10,7 @@ _args_ is a simple single-header library for parsing command-line arguments in C
 
 int main(int argc, char **argv) {
     // Zero-initialize library state.
-    args a = {0};
+    Args a = {0};
 
     // Define options.
     bool *help = option_flag(&a, 'h', "help", "Show help");
