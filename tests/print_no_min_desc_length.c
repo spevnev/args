@@ -22,7 +22,7 @@
 //>                                option
 //>       --str                    A string
 //>                                option
-//>                                (default: some default)
+//>                                (default: "some default")
 //>   -p, --path                   A path
 //>                                option
 //>                                (default: none)

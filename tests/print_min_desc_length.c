@@ -9,5 +9,5 @@
 //>                                (default: false)
 //>       --option-with-long-name  A long option (default: 12)
 //>   -f, --float                  A float option
-//>       --str                    A string option (default: some default)
+//>       --str                    A string option (default: "some default")
 //>   -p, --path                   A path option (default: none)

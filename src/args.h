@@ -157,7 +157,9 @@ static Args__Option *args__new_option(
 
     if (description != NULL) {
         for (const char *c = description; *c != '\0'; c++) {
-            if (*c == '\n') ARGS__FATAL("Description must not contain newlines. It will be split automatically");
+            if (*c == '\n' || *c == '\r') {
+                ARGS__FATAL("Description must not contain newlines. It will be split automatically");
+            }
             if (*c == '\t') ARGS__FATAL("Description must not contain tabs to maintain proper length");
             if (!isprint(*c)) ARGS__FATAL("Description of \"%s\" contains an invalid character 0x%x", long_name, *c);
         }
@@ -381,6 +383,7 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static float *option_float(
 // Defines a string option, returns a pointer set by `parse_args`.
 // String memory is owned by library, freed by `free_args`.
 // Use '\0' for no short name.
+// Result is NULL only if default value is NULL and option isn't set.
 // Exits if `a` or `long_name` is NULL, or out of memory.
 ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const char **option_str(
     Args *a,
@@ -672,9 +675,25 @@ ARGS__MAYBE_UNUSED static void print_options(Args *a, FILE *fp) {
                 case ARGS__TYPE_PATH:
                     if (option->value.str == NULL) {
                         fprintf(fp, "none");
-                    } else {
-                        fprintf(fp, "%s", option->value.str);
+                        break;
                     }
+
+                    fprintf(fp, "\"");
+                    for (const char *c = option->value.str; *c != '\0'; c++) {
+                        switch (*c) {
+                            case '\n': fprintf(fp, "\\n"); break;
+                            case '\r': fprintf(fp, "\\r"); break;
+                            case '\t': fprintf(fp, "\\t"); break;
+                            default:
+                                if (isprint(*c)) {
+                                    fprintf(fp, "%c", *c);
+                                } else {
+                                    fprintf(fp, "\\x%02hhx", *c);
+                                }
+                                break;
+                        }
+                    }
+                    fprintf(fp, "\"");
                     break;
                 case ARGS__TYPE_BOOL: fprintf(fp, "%s", option->value.bool_ ? "true" : "false"); break;
             }
