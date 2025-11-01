@@ -14,3 +14,7 @@ AlignTrailingComments: true
 DerivePointerAlignment: false
 PointerAlignment: Right
 AlignArrayOfStructures: Left
+BinPackParameters: OnePerLine
+AllowAllParametersOfDeclarationOnNextLine: false
+AlignAfterOpenBracket: BlockIndent
+PenaltyReturnTypeOnItsOwnLine: 10000
