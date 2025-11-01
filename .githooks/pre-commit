@@ -3,13 +3,10 @@
 
 set -euo pipefail
 
-INPUT=README.md.in
-OUTPUT=README.md
+INPUT_PATH=README.md.in
+OUTPUT_PATH=README.md
 
-if [[ ! -f "$INPUT" ]]; then
-	echo "ERROR: Failed to find \"$INPUT\"" >&2
-	exit 1
-fi
+input=$(git show :"$INPUT_PATH")
 
 # Replace lines "!path/to/file" with the contents of the file.
 while IFS= read -r line; do
@@ -24,7 +21,8 @@ while IFS= read -r line; do
         exit 1
     fi
 
-	cat $path
-done < $INPUT > $OUTPUT
+    # Use staged version of file to exclude uncommitted changes.
+	git show :"$path"
+done <<< $input > $OUTPUT_PATH
 
-git add $OUTPUT
+git add $OUTPUT_PATH
