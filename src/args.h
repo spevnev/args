@@ -450,7 +450,7 @@ static int parse_args(Args *a, int argc, char **argv, char ***pos_args) {
 
     ARGS__ASSERT(argc >= 0);
     if (argc == 0) ARGS__FATAL("Expected the first argument to be a program name");
-    const char *program_name = args__basename(argv[0]);
+    ARGS__MAYBE_UNUSED const char *program_name = args__basename(argv[0]);
     argc--;
     argv++;
 
@@ -467,9 +467,7 @@ static int parse_args(Args *a, int argc, char **argv, char ***pos_args) {
         }
     }
 
-#ifdef ARGS_DISABLE_COMPLETION
-    (void) program_name;
-#else
+#ifndef ARGS_DISABLE_COMPLETION
     if (argc >= 1 && strcmp(argv[0], "completion") == 0) {
         if (argc == 1) ARGS__FATAL("Command 'completion' requires an argument: bash, zsh, fish");
 

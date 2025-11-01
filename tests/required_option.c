@@ -12,5 +12,7 @@ int main(int argc, char **argv) {
     (void) !option_long(&a, 'o', "opt", NULL, false, 0);
 
     parse_args(&a, argc, argv, NULL);
+
+    free_args(&a);
     _exit(EXIT_FAILURE);
 }

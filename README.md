@@ -22,7 +22,7 @@ int main(int argc, char **argv) {
 
     // If enum is continuous and array matches it, result of `option_enum` can be converted directly.
     typedef enum { FIRST, SECOND, THIRD } Enum;
-    const char *enum_values[] = {"first", "second", "third", NULL};
+    const char *enum_values[] = {"fi rst", "sec:ond", "th)i(rd", NULL};
     Enum *e = (Enum *) option_enum(&a, 'e', "enum", "An enum option", true, FIRST, enum_values);
     // If values don't match the enum, or it isn't continuous, it may be desirable to get a string instead.
     const char **es = option_enum_str(&a, '\0', "enum-str", "A string enum option", true, "default", enum_values);

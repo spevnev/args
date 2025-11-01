@@ -14,5 +14,7 @@ int main(int argc, char **argv) {
     (void) !option_flag(&a, 'b', "optb", NULL);
 
     parse_args(&a, argc, argv, NULL);
+
+    free_args(&a);
     _exit(EXIT_FAILURE);
 }
