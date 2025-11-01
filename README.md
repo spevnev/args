@@ -20,11 +20,12 @@ int main(int argc, char **argv) {
     const char **s = option_str(&a, 's', "str", "A string option", true, NULL);
     const char **p = option_path(&a, 'p', "path", "A path option", true, NULL);
 
-    // TODO: show index-ed enum parallel to an enum, and string, more custom
+    // If enum is continuous and array matches it, result of `option_enum` can be converted directly.
+    typedef enum { FIRST, SECOND, THIRD } Enum;
     const char *enum_values[] = {"first", "second", "third", NULL};
-    size_t enum_none = -1ULL;
-    size_t *e = option_enum(&a, 'e', "enum", "An index enum option", true, enum_none, enum_values);
-    const char **E = option_enum_str(&a, 'E', "ENUM", "A string enum option", true, "Default", enum_values);
+    Enum *e = (Enum *) option_enum(&a, 'e', "enum", "An enum option", true, FIRST, enum_values);
+    // If values don't match the enum, or it isn't continuous, it may be desirable to get a string instead.
+    const char **es = option_enum_str(&a, '\0', "enum-str", "A string enum option", true, "default", enum_values);
 
     // Parse arguments. Sets option values and returns positional arguments.
     // Handles shell completion by printing to stdout and exiting.
@@ -57,7 +58,7 @@ int main(int argc, char **argv) {
     }
 
     // Use option values.
-    printf("options: l=%ld f=%f s=%s p=%s e=%s E=%s\n", *l, *f, *s, *p, *e == enum_none ? "none" : enum_values[*e], *E);
+    printf("options: l=%ld f=%f s='%s' p='%s' e=%d E=%s\n", *l, *f, *s, *p, *e, *es);
 
     // Handle positional arguments.
     printf("positional arguments:");
@@ -74,7 +75,11 @@ int main(int argc, char **argv) {
 
 Supported shells: bash, zsh, fish.
 
-Scripts should be installed through the build system, package manager, or explicitly by user. \
+Completion options are generated *dynamically* by the executable which means:
+1. Completion scripts do *not* need to be updated or reinstalled.
+2. Executable *must* be in the PATH for completion to work.
+
+Completions scripts should be installed through the build system, package manager, or explicitly by user. \
 For system-wide installation:
 
 ```shell

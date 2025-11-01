@@ -13,7 +13,11 @@
 
 Supported shells: bash, zsh, fish.
 
-Scripts should be installed through the build system, package manager, or explicitly by user. \
+Completion options are generated *dynamically* by the executable which means:
+1. Completion scripts do *not* need to be updated or reinstalled.
+2. Executable *must* be in the PATH for completion to work.
+
+Completions scripts should be installed through the build system, package manager, or explicitly by user. \
 For system-wide installation:
 
 ```shell

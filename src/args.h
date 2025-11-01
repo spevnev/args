@@ -280,16 +280,19 @@ static void args__completion_zsh_complete(Args *a) {
             description = buffer;
         }
 
+        // Define short and long option names as mutually exclusive.
         if (i->short_name != '\0') {
             printf("(-%c --%s)-%c%s\n", i->short_name, i->long_name, i->short_name, description);
             printf("(-%c --%s)", i->short_name, i->long_name);
         }
         printf("--%s", i->long_name);
+        // Add '=' after the long option except for flags which don't accept values.
         if (i->type != ARGS__TYPE_BOOL) printf("=");
         printf("%s", description);
         if (i->type == ARGS__TYPE_PATH) printf(":path:_files");
         printf("\n");
     }
+    // Set default completion of positional arguments to path.
     printf("*:file:_files\n");
     free(buffer);
 }
@@ -302,7 +305,10 @@ static void args__completion_fish_complete(Args *a) {
     if (buffer == NULL) ARGS__OUT_OF_MEMORY();
     for (Args__Option *i = a->head; i != NULL; i = i->next) {
         printf("-l %s -%c", i->long_name, i->type == ARGS__TYPE_PATH ? 'F' : 'f');
-        if (i->short_name != '\0') printf(" -s %c -r", i->short_name);
+        if (i->short_name != '\0') {
+            // Use '-r' to avoid stacking short options.
+            printf(" -s %c -r", i->short_name);
+        }
         if (i->description != NULL) {
             // Escape '$', '"' and '\'.
             char *c = buffer;
@@ -382,8 +388,8 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static float *option_float(
 
 // Defines a string option, returns a pointer set by `parse_args`.
 // String memory is owned by library, freed by `free_args`.
+// Result can be NULL only if default value is NULL.
 // Use '\0' for no short name.
-// Result is NULL only if default value is NULL and option isn't set.
 // Exits if `a` or `long_name` is NULL, or out of memory.
 ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const char **option_str(
     Args *a,
