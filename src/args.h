@@ -51,8 +51,8 @@
 #define ARGS_MIN_DESC_LENGTH 30
 #endif
 
-typedef struct Args__option {
-    struct Args__option *next;
+typedef struct Args__Option {
+    struct Args__Option *next;
     char short_name;
     char *long_name;
     char *description;
@@ -594,7 +594,7 @@ ARGS__MAYBE_UNUSED static void print_options(Args *a, FILE *fp) {
         fprintf(fp, "%*c", length_diff + ARGS_PADDING, ' ');
 
         ARGS__MAYBE_UNUSED bool is_multiline = false;
-        ARGS__MAYBE_UNUSED int offset = 8 + longest_option + ARGS_PADDING;
+        int offset = 8 + longest_option + ARGS_PADDING;
         // Print description and break into multiple lines if needed.
         if (option->description != NULL) {
             int line_length = ARGS_LINE_LENGTH - offset;

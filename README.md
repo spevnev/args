@@ -80,7 +80,7 @@ PROGRAM_NAME completion fish > /usr/share/fish/vendor_completions.d/PROGRAM_NAME
 ## Library options
 
 | option                    | description                                                      | default     |
-| ------------------------- | ---------------------------------------------------------------- | ----------- |
+|---------------------------|------------------------------------------------------------------|-------------|
 | `ARGS_DISABLE_COMPLETION` | Disable shell completion                                         | not defined |
 | `ARGS_SKIP_UNKNOWN`       | Skip unknown options, otherwise it is an error                   | not defined |
 | `ARGS_ALLOW_OVERWRITING`  | Allow overwriting option, otherwise it is an error               | not defined |
