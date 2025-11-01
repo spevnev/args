@@ -1,0 +1,30 @@
+#!/bin/bash
+# Update example in README before committing.
+
+set -euo pipefail
+
+INPUT=README.md.in
+OUTPUT=README.md
+
+if [[ ! -f "$INPUT" ]]; then
+	echo "ERROR: Failed to find \"$INPUT\"" >&2
+	exit 1
+fi
+
+# Replace lines "!path/to/file" with the contents of the file.
+while IFS= read -r line; do
+    if [[ $line != !* ]]; then
+        echo "$line"
+        continue
+    fi
+
+    path="${line#!}"
+    if [[ ! -f "$path" ]]; then
+        echo "ERROR: Failed to find \"$path\"" >&2
+        exit 1
+    fi
+
+	cat $path
+done < $INPUT > $OUTPUT
+
+git add $OUTPUT

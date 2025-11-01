@@ -88,3 +88,11 @@ PROGRAM_NAME completion fish > /usr/share/fish/vendor_completions.d/PROGRAM_NAME
 | `ARGS_LINE_LENGTH`        | Line length                                                      | 80          |
 | `ARGS_MIN_DESC_LENGTH`    | Minimum length of the description line, ignoring the line length | 30          |
 | `ARGS_HIDE_DEFAULTS`      | Hides default values when printing options                       | not defined |
+
+## Contributing
+
+Configure git to use pre-commit hook to update README if example changes:
+
+```console
+$ git config --local core.hooksPath .githooks
+```
