@@ -51,8 +51,8 @@
 #define ARGS_MIN_DESC_LENGTH 30
 #endif
 
-typedef struct Args_option {
-    struct Args_option *next;
+typedef struct Args__option {
+    struct Args__option *next;
     char short_name;
     char *long_name;
     char *description;
@@ -593,13 +593,14 @@ ARGS__MAYBE_UNUSED static void print_options(Args *a, FILE *fp) {
         int length_diff = longest_option - strlen(option->long_name);
         fprintf(fp, "%*c", length_diff + ARGS_PADDING, ' ');
 
+        ARGS__MAYBE_UNUSED bool is_multiline = false;
+        ARGS__MAYBE_UNUSED int offset = 8 + longest_option + ARGS_PADDING;
         // Print description and break into multiple lines if needed.
         if (option->description != NULL) {
-            int offset = 8 + longest_option + ARGS_PADDING;
             int line_length = ARGS_LINE_LENGTH - offset;
             if (line_length < ARGS_MIN_DESC_LENGTH) line_length = ARGS_MIN_DESC_LENGTH;
             int length = strlen(option->description);
-            ARGS__MAYBE_UNUSED bool is_multiline = length > line_length;
+            is_multiline = length > line_length;
             char *cur = option->description;
             while (length > line_length) {
                 // Find the closest space to break the line.
@@ -615,21 +616,16 @@ ARGS__MAYBE_UNUSED static void print_options(Args *a, FILE *fp) {
                 length -= chunk_length + 1;
             }
             fprintf(fp, "%s", cur);
-
-#ifndef ARGS_HIDE_DEFAULTS
-            if (option->is_optional) {
-                if (is_multiline) {
-                    // Print description on the new line to avoid breaking it too.
-                    fprintf(fp, "\n%*c", offset, ' ');
-                } else {
-                    fprintf(fp, " ");
-                }
-            }
-#endif
         }
 
 #ifndef ARGS_HIDE_DEFAULTS
         if (option->is_optional) {
+            if (is_multiline) {
+                // Print description on the new line to avoid breaking it too.
+                fprintf(fp, "\n%*c", offset, ' ');
+            } else {
+                fprintf(fp, " ");
+            }
             fprintf(fp, "(default: ");
             switch (option->type) {
                 case ARGS__TYPE_LONG:  fprintf(fp, "%ld", option->value.long_); break;
