@@ -8,8 +8,7 @@ int main(int argc, char **argv) {
     Args a = {0};
     long *opt = option_long(&a, 'o', "opt", NULL, true, 0);
 
-    char **pos_args;
-    int pos_args_len = parse_args(&a, argc, argv, &pos_args);
+    int pos_args_len = parse_args(&a, argc, argv, NULL);
     assert(pos_args_len == 0);
 
     assert(*opt == 1);

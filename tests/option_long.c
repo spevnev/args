@@ -9,8 +9,7 @@ int main(int argc, char **argv) {
     long *s = option_long(&a, 's', "long3", NULL, false, 0);
     long *d = option_long(&a, '\0', "long4", NULL, true, 4);
 
-    char **pos_args;
-    int pos_args_len = parse_args(&a, argc, argv, &pos_args);
+    int pos_args_len = parse_args(&a, argc, argv, NULL);
     assert(pos_args_len == 0);
 
     assert(*l1 == 1);

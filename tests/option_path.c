@@ -9,8 +9,7 @@ int main(int argc, char **argv) {
     const char **s = option_path(&a, 's', "long3", NULL, false, NULL);
     const char **d = option_path(&a, '\0', "long4", NULL, true, "fourth");
 
-    char **pos_args;
-    int pos_args_len = parse_args(&a, argc, argv, &pos_args);
+    int pos_args_len = parse_args(&a, argc, argv, NULL);
     assert(pos_args_len == 0);
 
     assert(strcmp(*l1, "first") == 0);

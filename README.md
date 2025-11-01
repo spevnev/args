@@ -20,6 +20,12 @@ int main(int argc, char **argv) {
     const char **s = option_str(&a, 's', "str", "A string option", true, NULL);
     const char **p = option_path(&a, 'p', "path", "A path option", true, NULL);
 
+    // TODO: show index-ed enum parallel to an enum, and string, more custom
+    const char *enum_values[] = {"first", "second", "third", NULL};
+    size_t enum_none = -1ULL;
+    size_t *e = option_enum(&a, 'e', "enum", "An index enum option", true, enum_none, enum_values);
+    const char **E = option_enum_str(&a, 'E', "ENUM", "A string enum option", true, "Default", enum_values);
+
     // Parse arguments. Sets option values and returns positional arguments.
     // Handles shell completion by printing to stdout and exiting.
     // Exits on errors: wrong option value, missing required option, unknown option, etc.
@@ -51,7 +57,7 @@ int main(int argc, char **argv) {
     }
 
     // Use option values.
-    printf("options: l=%ld f=%f s=%s p=%s\n", *l, *f, *s, *p);
+    printf("options: l=%ld f=%f s=%s p=%s e=%s E=%s\n", *l, *f, *s, *p, *e == enum_none ? "none" : enum_values[*e], *E);
 
     // Handle positional arguments.
     printf("positional arguments:");

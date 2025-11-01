@@ -517,7 +517,8 @@ static int parse_args(Args *a, int argc, char **argv, char ***pos_args) {
         argv++;
 
         if (arg_len < 2 || arg[0] != '-') {
-            if (pos_args != NULL) (*pos_args)[pos_args_idx++] = arg;
+            if (pos_args != NULL) (*pos_args)[pos_args_idx] = arg;
+            pos_args_idx++;
             continue;
         }
 
