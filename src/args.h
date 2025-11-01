@@ -38,6 +38,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 #ifndef ARGS_PADDING
 #define ARGS_PADDING 2
@@ -64,12 +65,25 @@ typedef struct Args__Option {
         ARGS__TYPE_STR,
         ARGS__TYPE_PATH,
         ARGS__TYPE_BOOL,
+        ARGS__TYPE_ENUM_IDX,
+        ARGS__TYPE_ENUM_STR,
     } type;
     struct {
         long long_;
         float float_;
         char *str;
         bool bool_;
+        struct {
+            char **values;
+            unsigned int length;
+            union {
+                size_t index;
+                struct {
+                    const char *current;
+                    char *default_;
+                } value;
+            } as;
+        } enum_;
     } value;
 } Args__Option;
 
@@ -90,6 +104,12 @@ typedef struct {
 #define ARGS__WARN_UNUSED_RESULT __attribute__((warn_unused_result))
 #else
 #define ARGS__WARN_UNUSED_RESULT
+#endif
+
+#if defined(__has_attribute) && __has_attribute(fallthrough)
+#define ARGS__FALLTHROUGH __attribute__((fallthrough))
+#else
+#define ARGS__FALLTHROUGH
 #endif
 
 #define ARGS__FATAL(...)              \
@@ -186,6 +206,27 @@ static Args__Option *args__new_option(
     return option;
 }
 
+static void args__set_enum_values(Args__Option *option, const char **values) {
+    ARGS__ASSERT(option != NULL && values != NULL);
+
+    size_t length = 0;
+    while (values[length] != NULL) length++;
+    option->value.enum_.length = length;
+
+    char **dup = malloc(sizeof(*dup) * length);
+    if (dup == NULL) ARGS__OUT_OF_MEMORY();
+    option->value.enum_.values = dup;
+
+    for (size_t i = 0; i < length; i++) {
+        for (const char *c = values[i]; *c != '\0'; c++) {
+            if (!isprint(*c)) {
+                ARGS__FATAL("Enum value of \"%s\" contains an invalid character 0x%x", option->long_name, *c);
+            }
+        }
+        dup[i] = args__strdup(values[i]);
+    }
+}
+
 static void args__parse_value(Args__Option *option, const char *value) {
     ARGS__ASSERT(option != NULL && value != NULL);
     switch (option->type) {
@@ -202,6 +243,54 @@ static void args__parse_value(Args__Option *option, const char *value) {
         case ARGS__TYPE_STR:
         case ARGS__TYPE_PATH: option->value.str = args__strdup(value); break;
         case ARGS__TYPE_BOOL: ARGS__UNREACHABLE(); break;
+        case ARGS__TYPE_ENUM_IDX:
+        case ARGS__TYPE_ENUM_STR:
+            for (size_t i = 0; i < option->value.enum_.length; i++) {
+                if (strcasecmp(option->value.enum_.values[i], value) != 0) continue;
+
+                if (option->type == ARGS__TYPE_ENUM_IDX) {
+                    option->value.enum_.as.index = i;
+                } else {
+                    option->value.enum_.as.value.current = option->value.enum_.values[i];
+                }
+                return;
+            }
+            ARGS__FATAL("Invalid value \"%s\" for option \"%s\"", value, option->long_name);
+    }
+}
+
+ARGS__MAYBE_UNUSED static void args__print_str_default(FILE *fp, const char *str) {
+    ARGS__ASSERT(fp != NULL);
+
+    if (str == NULL) {
+        fprintf(fp, "none");
+        return;
+    }
+
+    fprintf(fp, "\"");
+    for (const char *c = str; *c != '\0'; c++) {
+        switch (*c) {
+            case '\n': fprintf(fp, "\\n"); break;
+            case '\r': fprintf(fp, "\\r"); break;
+            case '\t': fprintf(fp, "\\t"); break;
+            default:
+                if (isprint(*c)) {
+                    fprintf(fp, "%c", *c);
+                } else {
+                    fprintf(fp, "\\x%02hhx", *c);
+                }
+                break;
+        }
+    }
+    fprintf(fp, "\"");
+}
+
+// Prints strings with '\' and chars in `escaped_chars` escaped with '\'.
+ARGS__MAYBE_UNUSED static void args__print_escaped(const char *str, const char *escaped_chars) {
+    ARGS__ASSERT(str != NULL && escaped_chars != NULL);
+    for (const char *c = str; *c != '\0'; c++) {
+        if (strchr(escaped_chars, *c) != NULL || *c == '\\') printf("\\");
+        printf("%c", *c);
     }
 }
 
@@ -259,70 +348,71 @@ static void args__completion_bash_complete(Args *a) {
     printf("\n");
 }
 
+static void args__completion_zsh_print_option_details(Args__Option *option) {
+    ARGS__ASSERT(option != NULL);
+
+    if (option->description != NULL) {
+        printf("[");
+        args__print_escaped(option->description, "]");
+        printf("]");
+    }
+
+    switch (option->type) {
+        case ARGS__TYPE_PATH: printf(":path:_files"); break;
+        case ARGS__TYPE_ENUM_IDX:
+        case ARGS__TYPE_ENUM_STR:
+            printf(":%s:(", option->long_name);
+            for (size_t i = 0; i < option->value.enum_.length; i++) {
+                if (i > 0) printf(" ");
+                args__print_escaped(option->value.enum_.values[i], " :()");
+            }
+            printf(")");
+            break;
+        default: break;  // Other types can accept anything, no suggestions.
+    }
+    printf("\n");
+}
+
 static void args__completion_zsh_complete(Args *a) {
     ARGS__ASSERT(a != NULL);
-
-    // Double the size in the extreme case that description consists entirely of escaped characters.
-    char *buffer = malloc(a->max_descr_len * 2 + 1);
-    if (buffer == NULL) ARGS__OUT_OF_MEMORY();
     for (Args__Option *i = a->head; i != NULL; i = i->next) {
-        const char *description = "";
-        if (i->description != NULL) {
-            // Escape ']' and '\' in description, and wrap in square brackets as format requires.
-            char *c = buffer;
-            *c++ = '[';
-            for (char *j = i->description; *j != '\0'; j++) {
-                if (*j == ']' || *j == '\\') *c++ = '\\';
-                *c++ = *j;
-            }
-            *c++ = ']';
-            *c++ = '\0';
-            description = buffer;
-        }
-
-        // Define short and long option names as mutually exclusive.
         if (i->short_name != '\0') {
-            printf("(-%c --%s)-%c%s\n", i->short_name, i->long_name, i->short_name, description);
+            printf("(-%c --%s)-%c", i->short_name, i->long_name, i->short_name);
+            args__completion_zsh_print_option_details(i);
+
             printf("(-%c --%s)", i->short_name, i->long_name);
         }
         printf("--%s", i->long_name);
-        // Add '=' after the long option except for flags which don't accept values.
         if (i->type != ARGS__TYPE_BOOL) printf("=");
-        printf("%s", description);
-        if (i->type == ARGS__TYPE_PATH) printf(":path:_files");
-        printf("\n");
+        args__completion_zsh_print_option_details(i);
     }
     // Set default completion of positional arguments to path.
     printf("*:file:_files\n");
-    free(buffer);
 }
 
 static void args__completion_fish_complete(Args *a) {
     ARGS__ASSERT(a != NULL);
-
-    // Double the size in the extreme case that description consists entirely of escaped characters.
-    char *buffer = malloc(a->max_descr_len * 2 + 1);
-    if (buffer == NULL) ARGS__OUT_OF_MEMORY();
     for (Args__Option *i = a->head; i != NULL; i = i->next) {
         printf("-l %s -%c", i->long_name, i->type == ARGS__TYPE_PATH ? 'F' : 'f');
+        if (i->type == ARGS__TYPE_ENUM_IDX || i->type == ARGS__TYPE_ENUM_STR) {
+            printf(" -a '");
+            for (size_t j = 0; j < i->value.enum_.length; j++) {
+                if (j > 0) printf(" ");
+                args__print_escaped(i->value.enum_.values[j], " \"$()");
+            }
+            printf("'");
+        }
         if (i->short_name != '\0') {
             // Use '-r' to avoid stacking short options.
             printf(" -s %c -r", i->short_name);
         }
         if (i->description != NULL) {
-            // Escape '$', '"' and '\'.
-            char *c = buffer;
-            for (char *j = i->description; *j != '\0'; j++) {
-                if (*j == '$' || *j == '"' || *j == '\\') *c++ = '\\';
-                *c++ = *j;
-            }
-            *c++ = '\0';
-
-            printf(" -d \"%s\"", buffer);
+            printf(" -d \"");
+            args__print_escaped(i->description, "\"$");
+            printf("\"");
         }
         printf("\n");
     }
-    free(buffer);
 }
 #endif
 
@@ -336,10 +426,22 @@ static void free_args(Args *a) {
 
     Args__Option *current = a->head;
     while (current != NULL) {
-        Args__Option *next = current->next;
+        switch (current->type) {
+            case ARGS__TYPE_LONG:
+            case ARGS__TYPE_FLOAT:
+            case ARGS__TYPE_BOOL:     break;
+            case ARGS__TYPE_STR:
+            case ARGS__TYPE_PATH:     free(current->value.str); break;
+            case ARGS__TYPE_ENUM_STR: free(current->value.enum_.as.value.default_); ARGS__FALLTHROUGH;
+            case ARGS__TYPE_ENUM_IDX:
+                for (size_t i = 0; i < current->value.enum_.length; i++) free(current->value.enum_.values[i]);
+                free(current->value.enum_.values);
+                break;
+        }
         free(current->long_name);
         free(current->description);
-        if (current->type == ARGS__TYPE_STR || current->type == ARGS__TYPE_PATH) free(current->value.str);
+
+        Args__Option *next = current->next;
         free(current);
         current = next;
     }
@@ -437,6 +539,52 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static bool *option_flag(
     option->type = ARGS__TYPE_BOOL;
     option->value.bool_ = false;
     return &option->value.bool_;
+}
+
+// Defines an enum option, returns a pointer set by `parse_args`.
+// Result is either a valid index or a default value.
+// `values` must be a NULL-terminated array, matched case-insensitively.
+// Use '\0' for no short name.
+// Exits if `a`, `long_name`, or `values` is NULL, or out of memory.
+ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static size_t *option_enum(
+    Args *a,
+    char short_name,
+    const char *long_name,
+    const char *description,
+    bool is_optional,
+    size_t default_value,
+    const char **values
+) {
+    ARGS__ASSERT(a != NULL && values != NULL);
+    Args__Option *option = args__new_option(a, short_name, long_name, description, is_optional);
+    option->type = ARGS__TYPE_ENUM_IDX;
+    args__set_enum_values(option, values);
+    option->value.enum_.as.index = default_value;
+    return &option->value.enum_.as.index;
+}
+
+// Defines an enum option, returns a pointer set by `parse_args`.
+// Result is either a string from `values` or a default value.
+// String and array memory is owned by library, freed by `free_args`.
+// `values` must be a NULL-terminated array, matched case-insensitively.
+// Use '\0' for no short name.
+// Exits if `a`, `long_name`, or `values` is NULL, or out of memory.
+ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const char **option_enum_str(
+    Args *a,
+    char short_name,
+    const char *long_name,
+    const char *description,
+    bool is_optional,
+    const char *default_value,
+    const char **values
+) {
+    ARGS__ASSERT(a != NULL && values != NULL);
+    Args__Option *option = args__new_option(a, short_name, long_name, description, is_optional);
+    option->type = ARGS__TYPE_ENUM_STR;
+    args__set_enum_values(option, values);
+    option->value.enum_.as.value.default_ = default_value == NULL ? NULL : args__strdup(default_value);
+    option->value.enum_.as.value.current = option->value.enum_.as.value.default_;
+    return &option->value.enum_.as.value.current;
 }
 
 // Parses arguments, sets option-returned values.
@@ -674,33 +822,19 @@ ARGS__MAYBE_UNUSED static void print_options(Args *a, FILE *fp) {
             }
             fprintf(fp, "(default: ");
             switch (option->type) {
-                case ARGS__TYPE_LONG:  fprintf(fp, "%ld", option->value.long_); break;
-                case ARGS__TYPE_FLOAT: fprintf(fp, "%.3f", option->value.float_); break;
+                case ARGS__TYPE_LONG:     fprintf(fp, "%ld", option->value.long_); break;
+                case ARGS__TYPE_FLOAT:    fprintf(fp, "%.3f", option->value.float_); break;
+                case ARGS__TYPE_BOOL:     fprintf(fp, "%s", option->value.bool_ ? "true" : "false"); break;
                 case ARGS__TYPE_STR:
-                case ARGS__TYPE_PATH:
-                    if (option->value.str == NULL) {
+                case ARGS__TYPE_PATH:     args__print_str_default(fp, option->value.str); break;
+                case ARGS__TYPE_ENUM_STR: args__print_str_default(fp, option->value.enum_.as.value.current); break;
+                case ARGS__TYPE_ENUM_IDX:
+                    if (option->value.enum_.as.index >= option->value.enum_.length) {
                         fprintf(fp, "none");
-                        break;
+                    } else {
+                        args__print_str_default(fp, option->value.enum_.values[option->value.enum_.as.index]);
                     }
-
-                    fprintf(fp, "\"");
-                    for (const char *c = option->value.str; *c != '\0'; c++) {
-                        switch (*c) {
-                            case '\n': fprintf(fp, "\\n"); break;
-                            case '\r': fprintf(fp, "\\r"); break;
-                            case '\t': fprintf(fp, "\\t"); break;
-                            default:
-                                if (isprint(*c)) {
-                                    fprintf(fp, "%c", *c);
-                                } else {
-                                    fprintf(fp, "\\x%02hhx", *c);
-                                }
-                                break;
-                        }
-                    }
-                    fprintf(fp, "\"");
                     break;
-                case ARGS__TYPE_BOOL: fprintf(fp, "%s", option->value.bool_ ? "true" : "false"); break;
             }
             fprintf(fp, ")");
         }
@@ -711,6 +845,7 @@ ARGS__MAYBE_UNUSED static void print_options(Args *a, FILE *fp) {
 
 #undef ARGS__MAYBE_UNUSED
 #undef ARGS__WARN_UNUSED_RESULT
+#undef ARGS__FALLTHROUGH
 #undef ARGS__FATAL
 #undef ARGS__OUT_OF_MEMORY
 #undef ARGS__UNREACHABLE

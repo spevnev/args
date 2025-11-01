@@ -10,3 +10,5 @@
 //>   -f, --float                          A float option
 //>       --str                            A string option (default: "some default")
 //>   -p, --path                           A path option (default: none)
+//>       --enum-idx                       An index enum option (default: none)
+//>   -e, --enum-str                       A string enum option (default: "enum default")

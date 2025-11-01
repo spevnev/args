@@ -5,6 +5,7 @@
 ### Added
 
 - `ARGS_HIDE_DEFAULTS` to hide default values in `print_options`
+- Enum options: `option_enum` and `option_enum_str`
 - Tests for `print_options`
 - Pre-commit hook to automatically update example in README
 
@@ -17,6 +18,8 @@
 
 - Fix namespaces
 - Fix description splitting on non-spaces
+- Some tests missing `free_args`
+- Return number of positional arguments from `parse_args` even when `pos_args` is NULL
 
 ## [1.1.0](https://github.com/spevnev/args/releases/tag/v1.1.0)
 

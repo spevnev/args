@@ -9,3 +9,5 @@
 //>   -f, --float                  A float option
 //>       --str                    A string option
 //>   -p, --path                   A path option
+//>       --enum-idx               An index enum option
+//>   -e, --enum-str               A string enum option

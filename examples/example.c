@@ -12,6 +12,13 @@ int main(int argc, char **argv) {
     const char **s = option_str(&a, 's', "str", "A string option", true, NULL);
     const char **p = option_path(&a, 'p', "path", "A path option", true, NULL);
 
+    // If enum is continuous and array matches it, result of `option_enum` can be converted directly.
+    typedef enum { FIRST, SECOND, THIRD } Enum;
+    const char *enum_values[] = {"first", "second", "third", NULL};
+    Enum *e = (Enum *) option_enum(&a, 'e', "enum", "An enum option", true, FIRST, enum_values);
+    // If values don't match, or the enum isn't continuous, it may be desirable to get a string instead.
+    const char **es = option_enum_str(&a, '\0', "enum-str", "A string enum option", true, "default", enum_values);
+
     // Parse arguments. Sets option values and returns positional arguments.
     // Handles shell completion by printing to stdout and exiting.
     // Exits on errors: wrong option value, missing required option, unknown option, etc.
@@ -43,7 +50,7 @@ int main(int argc, char **argv) {
     }
 
     // Use option values.
-    printf("options: l=%ld f=%f s=%s p=%s\n", *l, *f, *s, *p);
+    printf("options: l=%ld f=%f s=\"%s\" p=\"%s\" e=%d E=\"%s\"\n", *l, *f, *s, *p, *e, *es);
 
     // Handle positional arguments.
     printf("positional arguments:");
