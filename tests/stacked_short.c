@@ -9,7 +9,7 @@ static void success(void) { _exit(EXIT_SUCCESS); }
 int main(int argc, char **argv) {
     atexit(success);
 
-    args a = {0};
+    Args a = {0};
     (void) !option_flag(&a, 'a', "opta", NULL);
     (void) !option_flag(&a, 'b', "optb", NULL);
 

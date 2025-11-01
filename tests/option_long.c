@@ -3,7 +3,7 @@
 
 //< --long1 1 --long2=0x2 -s 03
 int main(int argc, char **argv) {
-    args a = {0};
+    Args a = {0};
     long *l1 = option_long(&a, '\0', "long1", NULL, false, 0);
     long *l2 = option_long(&a, '\0', "long2", NULL, false, 0);
     long *s = option_long(&a, 's', "long3", NULL, false, 0);

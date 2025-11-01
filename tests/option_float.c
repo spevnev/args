@@ -3,7 +3,7 @@
 
 //< --long1 0.1 --long2=0.2 -s .3
 int main(int argc, char **argv) {
-    args a = {0};
+    Args a = {0};
     float *l1 = option_float(&a, '\0', "long1", NULL, false, 0);
     float *l2 = option_float(&a, '\0', "long2", NULL, false, 0);
     float *s = option_float(&a, 's', "long3", NULL, false, 0);

@@ -3,7 +3,7 @@
 
 //< --long1 -s
 int main(int argc, char **argv) {
-    args a = {0};
+    Args a = {0};
     bool *l1 = option_flag(&a, '\0', "long1", NULL);
     bool *s = option_flag(&a, 's', "long2", NULL);
     bool *d = option_flag(&a, '\0', "long3", NULL);

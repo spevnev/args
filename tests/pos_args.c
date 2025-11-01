@@ -3,7 +3,7 @@
 
 //< 1 --opt option 2 3
 int main(int argc, char **argv) {
-    args a = {0};
+    Args a = {0};
     (void) !option_str(&a, 'o', "opt", NULL, false, NULL);
 
     char **pos_args;
