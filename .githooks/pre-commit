@@ -1,11 +1,18 @@
 #!/bin/bash
-# Update example in README before committing.
+# Update README examples before committing.
+
+# Skip hook during rebase.
+if [ -n "$(git branch | grep "no branch")" ] || [ -n "$GIT_REFLOG_ACTION" ]; then
+    echo "Rebase detected: skipping pre-commit hook" >&2
+    exit 0
+fi
 
 set -euo pipefail
 
 INPUT_PATH=README.md.in
 OUTPUT_PATH=README.md
 
+# Use staged version of file to exclude uncommitted changes.
 input=$(git show :"$INPUT_PATH")
 
 # Replace lines "!path/to/file" with the contents of the file.
@@ -21,7 +28,6 @@ while IFS= read -r line; do
         exit 1
     fi
 
-    # Use staged version of file to exclude uncommitted changes.
 	git show :"$path"
 done <<< $input > $OUTPUT_PATH
 
