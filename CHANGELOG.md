@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Fix `__has_attribute` check
+
 ## [1.2.0](https://github.com/spevnev/args/releases/tag/v1.2.0)
 
 ### Added

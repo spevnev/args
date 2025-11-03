@@ -94,19 +94,25 @@ typedef struct {
     size_t max_descr_len;
 } Args;
 
-#if defined(__has_attribute) && __has_attribute(unused)
+#ifdef __has_attribute
+#define ARGS__HAS_ATTRIBUTE(attribute) __has_attribute(attribute)
+#else
+#define ARGS__HAS_ATTRIBUTE(attribute) 0
+#endif
+
+#if ARGS__HAS_ATTRIBUTE(unused)
 #define ARGS__MAYBE_UNUSED __attribute__((unused))
 #else
 #define ARGS__MAYBE_UNUSED
 #endif
 
-#if defined(__has_attribute) && __has_attribute(warn_unused_result)
+#if ARGS__HAS_ATTRIBUTE(warn_unused_result)
 #define ARGS__WARN_UNUSED_RESULT __attribute__((warn_unused_result))
 #else
 #define ARGS__WARN_UNUSED_RESULT
 #endif
 
-#if defined(__has_attribute) && __has_attribute(fallthrough)
+#if ARGS__HAS_ATTRIBUTE(fallthrough)
 #define ARGS__FALLTHROUGH __attribute__((fallthrough))
 #else
 #define ARGS__FALLTHROUGH
@@ -843,6 +849,7 @@ ARGS__MAYBE_UNUSED static void print_options(Args *a, FILE *fp) {
     }
 }
 
+#undef ARGS__HAS_ATTRIBUTE
 #undef ARGS__MAYBE_UNUSED
 #undef ARGS__WARN_UNUSED_RESULT
 #undef ARGS__FALLTHROUGH
