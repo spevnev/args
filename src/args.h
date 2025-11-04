@@ -183,9 +183,7 @@ static Args__Option *args__new_option(
 
     if (description != NULL) {
         for (const char *c = description; *c != '\0'; c++) {
-            if (*c == '\n' || *c == '\r') {
-                ARGS__FATAL("Description must not contain newlines. It will be split automatically");
-            }
+            if (*c == '\n') continue;
             if (*c == '\t') ARGS__FATAL("Description must not contain tabs to maintain proper length");
             if (!isprint(*c)) ARGS__FATAL("Description of \"%s\" contains an invalid character 0x%x", long_name, *c);
         }
@@ -789,39 +787,50 @@ ARGS__MAYBE_UNUSED static void print_options(Args *a, FILE *fp) {
         int length_diff = longest_option - strlen(option->long_name);
         fprintf(fp, "%*c", length_diff + ARGS_PADDING, ' ');
 
-        ARGS__MAYBE_UNUSED bool is_multiline = false;
+        ARGS__MAYBE_UNUSED bool is_desc_multiline = false;
         int offset = 8 + longest_option + ARGS_PADDING;
         // Print description and break into multiple lines if needed.
         if (option->description != NULL) {
             int line_length = ARGS_LINE_LENGTH - offset;
             if (line_length < ARGS_MIN_DESC_LENGTH) line_length = ARGS_MIN_DESC_LENGTH;
-            int length = strlen(option->description);
-            is_multiline = length > line_length;
+
+            bool is_first = true;
             char *cur = option->description;
-            while (length > line_length) {
-                // Find the closest space to break the line.
-                int chunk_length = line_length;
-                while (chunk_length > 0 && cur[chunk_length] != ' ') chunk_length--;
+            int length = strlen(option->description);
+            while (length > 0) {
+                if (!is_first) {
+                    is_desc_multiline = true;
+                    fprintf(fp, "\n%*c", offset, ' ');
+                }
+                is_first = false;
 
-                // If failed to find a space or it is too early, break mid-word.
-                if (chunk_length < line_length / 2) chunk_length = line_length;
+                // Look for an explicit line break.
+                int chunk_length = 0;
+                while (chunk_length < length && chunk_length < line_length && cur[chunk_length] != '\n') chunk_length++;
 
-                fprintf(fp, "%.*s\n%*c", chunk_length, cur, offset, ' ');
+                // If there isn't any, look for a space to break the line.
+                if (chunk_length == line_length) {
+                    while (chunk_length > 0 && cur[chunk_length] != ' ') chunk_length--;
 
-                if (cur[chunk_length] == ' ') {
+                    // If failed to find a space or it is too early, break mid-word.
+                    if (chunk_length < line_length / 2) chunk_length = line_length;
+                }
+
+                fprintf(fp, "%.*s", chunk_length, cur);
+
+                if (cur[chunk_length] == ' ' || cur[chunk_length] == '\n') {
                     cur++;
                     length--;
                 }
                 cur += chunk_length;
                 length -= chunk_length;
             }
-            fprintf(fp, "%s", cur);
         }
 
 #ifndef ARGS_HIDE_DEFAULTS
         if (option->is_optional) {
-            if (is_multiline) {
-                // Print description on the new line to avoid breaking it too.
+            if (is_desc_multiline) {
+                // Print default on the new line to avoid breaking it too.
                 fprintf(fp, "\n%*c", offset, ' ');
             } else {
                 fprintf(fp, " ");

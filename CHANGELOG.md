@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- Allow specifying line breaks ('\n) in description
+
 ### Fixed
 
 - Fix `__has_attribute` check
