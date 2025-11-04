@@ -226,7 +226,11 @@ static void args__set_enum_values(Args__Option *option, const char **values) {
     for (size_t i = 0; i < length; i++) {
         for (const char *c = values[i]; *c != '\0'; c++) {
             if (!isprint(*c)) {
-                ARGS__FATAL("Enum value of \"%s\" contains an invalid character 0x%x", option->long_name, *c);
+                ARGS__FATAL(
+                    "Enum value of \"%s\" contains an invalid character 0x%x. "
+                    "Maybe enum array is missing a NULL-terminator",
+                    option->long_name, *c
+                );
             }
         }
         dup[i] = args__strdup(values[i]);
