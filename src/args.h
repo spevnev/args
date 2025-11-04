@@ -139,7 +139,7 @@ typedef struct {
 static char *args__strdup(const char *str) {
     ARGS__ASSERT(str != NULL);
     size_t len = strlen(str);
-    char *dup = malloc(len + 1);
+    char *dup = (char *) malloc(len + 1);
     if (dup == NULL) ARGS__OUT_OF_MEMORY();
     memcpy(dup, str, len);
     dup[len] = '\0';
@@ -219,7 +219,7 @@ static void args__set_enum_values(Args__Option *option, const char **values) {
     while (values[length] != NULL) length++;
     option->value.enum_.length = length;
 
-    char **dup = malloc(sizeof(*dup) * length);
+    char **dup = (char **) malloc(sizeof(*dup) * length);
     if (dup == NULL) ARGS__OUT_OF_MEMORY();
     option->value.enum_.values = dup;
 
@@ -689,7 +689,7 @@ static int parse_args(Args *a, int argc, char **argv, char ***pos_args) {
 
     int pos_args_idx = 0;
     if (pos_args != NULL) {
-        a->pos_args = malloc(sizeof(*argv) * argc);
+        a->pos_args = (char **) malloc(sizeof(*argv) * argc);
         if (a->pos_args == NULL) ARGS__OUT_OF_MEMORY();
         *pos_args = a->pos_args;
     }

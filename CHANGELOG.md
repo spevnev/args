@@ -6,6 +6,10 @@
 
 - Allow specifying line breaks ('\n') in description
 
+### Changed
+
+- Make C++ compatible
+
 ### Fixed
 
 - Fix `__has_attribute` check
