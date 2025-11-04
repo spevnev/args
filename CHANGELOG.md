@@ -9,6 +9,7 @@
 ### Fixed
 
 - Fix `__has_attribute` check
+- Fix `print_options` printing current value instead of default
 
 ## [1.2.0](https://github.com/spevnev/args/releases/tag/v1.2.0)
 

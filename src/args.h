@@ -52,6 +52,16 @@
 #define ARGS_MIN_DESC_LENGTH 30
 #endif
 
+typedef enum {
+    ARGS__TYPE_LONG,
+    ARGS__TYPE_FLOAT,
+    ARGS__TYPE_STR,
+    ARGS__TYPE_PATH,
+    ARGS__TYPE_BOOL,
+    ARGS__TYPE_ENUM_IDX,
+    ARGS__TYPE_ENUM_STR,
+} Args__Type;
+
 typedef struct Args__Option {
     struct Args__Option *next;
     char short_name;
@@ -59,16 +69,15 @@ typedef struct Args__Option {
     char *description;
     bool is_optional;
     bool is_set;
-    enum {
-        ARGS__TYPE_LONG,
-        ARGS__TYPE_FLOAT,
-        ARGS__TYPE_STR,
-        ARGS__TYPE_PATH,
-        ARGS__TYPE_BOOL,
-        ARGS__TYPE_ENUM_IDX,
-        ARGS__TYPE_ENUM_STR,
-    } type;
-    struct {
+    Args__Type type;
+    union {
+        long long_;
+        float float_;
+        char *str;
+        bool bool_;
+        char *enum_;
+    } default_value;
+    union {
         long long_;
         float float_;
         char *str;
@@ -78,10 +87,7 @@ typedef struct Args__Option {
             unsigned int length;
             union {
                 size_t index;
-                struct {
-                    const char *current;
-                    char *default_;
-                } value;
+                const char *value;
             } as;
         } enum_;
     } value;
@@ -110,12 +116,6 @@ typedef struct {
 #define ARGS__WARN_UNUSED_RESULT __attribute__((warn_unused_result))
 #else
 #define ARGS__WARN_UNUSED_RESULT
-#endif
-
-#if ARGS__HAS_ATTRIBUTE(fallthrough)
-#define ARGS__FALLTHROUGH __attribute__((fallthrough))
-#else
-#define ARGS__FALLTHROUGH
 #endif
 
 #define ARGS__FATAL(...)              \
@@ -163,7 +163,8 @@ static Args__Option *args__new_option(
     char short_name,
     const char *long_name,
     const char *description,
-    bool is_optional
+    bool is_optional,
+    Args__Type type
 ) {
     ARGS__ASSERT(a != NULL);
 
@@ -200,6 +201,7 @@ static Args__Option *args__new_option(
     option->description = description == NULL ? NULL : args__strdup(description);
     option->is_optional = is_optional;
     option->is_set = false;
+    option->type = type;
 
     if (a->head == NULL) {
         a->head = option;
@@ -245,7 +247,10 @@ static void args__parse_value(Args__Option *option, const char *value) {
             if (end == NULL || *end != '\0') ARGS__FATAL("Invalid float \"%s\"", value);
         } break;
         case ARGS__TYPE_STR:
-        case ARGS__TYPE_PATH: option->value.str = args__strdup(value); break;
+        case ARGS__TYPE_PATH:
+            free(option->value.str);
+            option->value.str = args__strdup(value);
+            break;
         case ARGS__TYPE_BOOL: ARGS__UNREACHABLE(); break;
         case ARGS__TYPE_ENUM_IDX:
         case ARGS__TYPE_ENUM_STR:
@@ -255,7 +260,7 @@ static void args__parse_value(Args__Option *option, const char *value) {
                 if (option->type == ARGS__TYPE_ENUM_IDX) {
                     option->value.enum_.as.index = i;
                 } else {
-                    option->value.enum_.as.value.current = option->value.enum_.values[i];
+                    option->value.enum_.as.value = option->value.enum_.values[i];
                 }
                 return;
             }
@@ -433,11 +438,15 @@ static void free_args(Args *a) {
         switch (current->type) {
             case ARGS__TYPE_LONG:
             case ARGS__TYPE_FLOAT:
-            case ARGS__TYPE_BOOL:     break;
+            case ARGS__TYPE_BOOL:  break;
             case ARGS__TYPE_STR:
-            case ARGS__TYPE_PATH:     free(current->value.str); break;
-            case ARGS__TYPE_ENUM_STR: free(current->value.enum_.as.value.default_); ARGS__FALLTHROUGH;
+            case ARGS__TYPE_PATH:
+                free(current->default_value.str);
+                free(current->value.str);
+                break;
+            case ARGS__TYPE_ENUM_STR:
             case ARGS__TYPE_ENUM_IDX:
+                free(current->default_value.enum_);
                 for (size_t i = 0; i < current->value.enum_.length; i++) free(current->value.enum_.values[i]);
                 free(current->value.enum_.values);
                 break;
@@ -468,9 +477,8 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static long *option_long(
     long default_value
 ) {
     ARGS__ASSERT(a != NULL);
-    Args__Option *option = args__new_option(a, short_name, long_name, description, is_optional);
-    option->type = ARGS__TYPE_LONG;
-    option->value.long_ = default_value;
+    Args__Option *option = args__new_option(a, short_name, long_name, description, is_optional, ARGS__TYPE_LONG);
+    option->default_value.long_ = option->value.long_ = default_value;
     return &option->value.long_;
 }
 
@@ -486,9 +494,8 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static float *option_float(
     float default_value
 ) {
     ARGS__ASSERT(a != NULL);
-    Args__Option *option = args__new_option(a, short_name, long_name, description, is_optional);
-    option->type = ARGS__TYPE_FLOAT;
-    option->value.float_ = default_value;
+    Args__Option *option = args__new_option(a, short_name, long_name, description, is_optional, ARGS__TYPE_FLOAT);
+    option->default_value.float_ = option->value.float_ = default_value;
     return &option->value.float_;
 }
 
@@ -506,9 +513,14 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const char **option_str(
     const char *default_value
 ) {
     ARGS__ASSERT(a != NULL);
-    Args__Option *option = args__new_option(a, short_name, long_name, description, is_optional);
-    option->type = ARGS__TYPE_STR;
-    option->value.str = default_value == NULL ? NULL : args__strdup(default_value);
+    Args__Option *option = args__new_option(a, short_name, long_name, description, is_optional, ARGS__TYPE_STR);
+    if (default_value == NULL) {
+        option->default_value.str = NULL;
+        option->value.str = NULL;
+    } else {
+        option->default_value.str = args__strdup(default_value);
+        option->value.str = args__strdup(default_value);
+    }
     return (const char **) &option->value.str;
 }
 
@@ -523,9 +535,14 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const char **option_path(
     const char *default_value
 ) {
     ARGS__ASSERT(a != NULL);
-    Args__Option *option = args__new_option(a, short_name, long_name, description, is_optional);
-    option->type = ARGS__TYPE_PATH;
-    option->value.str = default_value == NULL ? NULL : args__strdup(default_value);
+    Args__Option *option = args__new_option(a, short_name, long_name, description, is_optional, ARGS__TYPE_PATH);
+    if (default_value == NULL) {
+        option->default_value.str = NULL;
+        option->value.str = NULL;
+    } else {
+        option->default_value.str = args__strdup(default_value);
+        option->value.str = args__strdup(default_value);
+    }
     return (const char **) &option->value.str;
 }
 
@@ -539,9 +556,8 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static bool *option_flag(
     const char *description
 ) {
     ARGS__ASSERT(a != NULL);
-    Args__Option *option = args__new_option(a, short_name, long_name, description, true);
-    option->type = ARGS__TYPE_BOOL;
-    option->value.bool_ = false;
+    Args__Option *option = args__new_option(a, short_name, long_name, description, true, ARGS__TYPE_BOOL);
+    option->default_value.bool_ = option->value.bool_ = false;
     return &option->value.bool_;
 }
 
@@ -560,10 +576,14 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static size_t *option_enum(
     const char **values
 ) {
     ARGS__ASSERT(a != NULL && values != NULL);
-    Args__Option *option = args__new_option(a, short_name, long_name, description, is_optional);
-    option->type = ARGS__TYPE_ENUM_IDX;
+    Args__Option *option = args__new_option(a, short_name, long_name, description, is_optional, ARGS__TYPE_ENUM_IDX);
     args__set_enum_values(option, values);
     option->value.enum_.as.index = default_value;
+    if (default_value < option->value.enum_.length) {
+        option->default_value.enum_ = args__strdup(values[default_value]);
+    } else {
+        option->default_value.enum_ = NULL;
+    }
     return &option->value.enum_.as.index;
 }
 
@@ -583,12 +603,11 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const char **option_enum_str(
     const char **values
 ) {
     ARGS__ASSERT(a != NULL && values != NULL);
-    Args__Option *option = args__new_option(a, short_name, long_name, description, is_optional);
-    option->type = ARGS__TYPE_ENUM_STR;
+    Args__Option *option = args__new_option(a, short_name, long_name, description, is_optional, ARGS__TYPE_ENUM_STR);
+    option->default_value.enum_ = default_value == NULL ? NULL : args__strdup(default_value);
     args__set_enum_values(option, values);
-    option->value.enum_.as.value.default_ = default_value == NULL ? NULL : args__strdup(default_value);
-    option->value.enum_.as.value.current = option->value.enum_.as.value.default_;
-    return &option->value.enum_.as.value.current;
+    option->value.enum_.as.value = option->default_value.enum_;
+    return &option->value.enum_.as.value;
 }
 
 // Parses arguments, sets option-returned values.
@@ -837,19 +856,13 @@ ARGS__MAYBE_UNUSED static void print_options(Args *a, FILE *fp) {
             }
             fprintf(fp, "(default: ");
             switch (option->type) {
-                case ARGS__TYPE_LONG:     fprintf(fp, "%ld", option->value.long_); break;
-                case ARGS__TYPE_FLOAT:    fprintf(fp, "%.3f", option->value.float_); break;
-                case ARGS__TYPE_BOOL:     fprintf(fp, "%s", option->value.bool_ ? "true" : "false"); break;
+                case ARGS__TYPE_LONG:     fprintf(fp, "%ld", option->default_value.long_); break;
+                case ARGS__TYPE_FLOAT:    fprintf(fp, "%.3f", option->default_value.float_); break;
+                case ARGS__TYPE_BOOL:     fprintf(fp, "%s", option->default_value.bool_ ? "true" : "false"); break;
                 case ARGS__TYPE_STR:
-                case ARGS__TYPE_PATH:     args__print_str_default(fp, option->value.str); break;
-                case ARGS__TYPE_ENUM_STR: args__print_str_default(fp, option->value.enum_.as.value.current); break;
-                case ARGS__TYPE_ENUM_IDX:
-                    if (option->value.enum_.as.index >= option->value.enum_.length) {
-                        fprintf(fp, "none");
-                    } else {
-                        args__print_str_default(fp, option->value.enum_.values[option->value.enum_.as.index]);
-                    }
-                    break;
+                case ARGS__TYPE_PATH:     args__print_str_default(fp, option->default_value.str); break;
+                case ARGS__TYPE_ENUM_STR:
+                case ARGS__TYPE_ENUM_IDX: args__print_str_default(fp, option->default_value.enum_); break;
             }
             fprintf(fp, ")");
         }
@@ -861,7 +874,6 @@ ARGS__MAYBE_UNUSED static void print_options(Args *a, FILE *fp) {
 #undef ARGS__HAS_ATTRIBUTE
 #undef ARGS__MAYBE_UNUSED
 #undef ARGS__WARN_UNUSED_RESULT
-#undef ARGS__FALLTHROUGH
 #undef ARGS__FATAL
 #undef ARGS__OUT_OF_MEMORY
 #undef ARGS__UNREACHABLE
