@@ -4,7 +4,7 @@
 
 ### Added
 
-- Allow specifying line breaks ('\n) in description
+- Allow specifying line breaks ('\n') in description
 
 ### Fixed
 

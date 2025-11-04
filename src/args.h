@@ -294,16 +294,21 @@ ARGS__MAYBE_UNUSED static void args__print_str_default(FILE *fp, const char *str
     fprintf(fp, "\"");
 }
 
+#ifndef ARGS_DISABLE_COMPLETION
 // Prints strings with '\' and chars in `escaped_chars` escaped with '\'.
-ARGS__MAYBE_UNUSED static void args__print_escaped(const char *str, const char *escaped_chars) {
+// Replaces '\n' with ' '.
+static void args__completion_print_escaped(const char *str, const char *escaped_chars) {
     ARGS__ASSERT(str != NULL && escaped_chars != NULL);
     for (const char *c = str; *c != '\0'; c++) {
-        if (strchr(escaped_chars, *c) != NULL || *c == '\\') printf("\\");
-        printf("%c", *c);
+        if (*c == '\n') {
+            printf(" ");
+        } else {
+            if (strchr(escaped_chars, *c) != NULL || *c == '\\') printf("\\");
+            printf("%c", *c);
+        }
     }
 }
 
-#ifndef ARGS_DISABLE_COMPLETION
 static void args__completion_bash_print(const char *program_name) {
     ARGS__ASSERT(program_name != NULL);
     printf(
@@ -362,7 +367,7 @@ static void args__completion_zsh_print_option_details(Args__Option *option) {
 
     if (option->description != NULL) {
         printf("[");
-        args__print_escaped(option->description, "]");
+        args__completion_print_escaped(option->description, "]");
         printf("]");
     }
 
@@ -373,7 +378,7 @@ static void args__completion_zsh_print_option_details(Args__Option *option) {
             printf(":%s:(", option->long_name);
             for (size_t i = 0; i < option->value.enum_.length; i++) {
                 if (i > 0) printf(" ");
-                args__print_escaped(option->value.enum_.values[i], " :()");
+                args__completion_print_escaped(option->value.enum_.values[i], " :()");
             }
             printf(")");
             break;
@@ -407,7 +412,7 @@ static void args__completion_fish_complete(Args *a) {
             printf(" -a '");
             for (size_t j = 0; j < i->value.enum_.length; j++) {
                 if (j > 0) printf(" ");
-                args__print_escaped(i->value.enum_.values[j], " \"$()");
+                args__completion_print_escaped(i->value.enum_.values[j], " \"$()");
             }
             printf("'");
         }
@@ -417,7 +422,7 @@ static void args__completion_fish_complete(Args *a) {
         }
         if (i->description != NULL) {
             printf(" -d \"");
-            args__print_escaped(i->description, "\"$");
+            args__completion_print_escaped(i->description, "\"$");
             printf("\"");
         }
         printf("\n");
