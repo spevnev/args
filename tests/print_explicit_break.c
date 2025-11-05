@@ -5,7 +5,6 @@
 //>   -o, --opt  Option with a very long description
 //>              that is explicitly split into multiple
 //>              lines using '\n'.
-//>              (default: false)
 int main(int argc, char **argv) {
     Args a = {0};
     (void) !option_flag(

@@ -9,6 +9,7 @@
 ### Changed
 
 - Make C++ compatible
+- Don't print `option_flag`'s default since it's always false
 
 ### Fixed
 

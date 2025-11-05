@@ -74,7 +74,6 @@ typedef struct Args__Option {
         long long_;
         float float_;
         char *str;
-        bool bool_;
         char *enum_;
     } default_value;
     union {
@@ -566,7 +565,7 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static bool *option_flag(
 ) {
     ARGS__ASSERT(a != NULL);
     Args__Option *option = args__new_option(a, short_name, long_name, description, true, ARGS__TYPE_BOOL);
-    option->default_value.bool_ = option->value.bool_ = false;
+    option->value.bool_ = false;
     return &option->value.bool_;
 }
 
@@ -856,7 +855,8 @@ ARGS__MAYBE_UNUSED static void print_options(Args *a, FILE *fp) {
         }
 
 #ifndef ARGS_HIDE_DEFAULTS
-        if (option->is_optional) {
+        // Flag's default is always false, don't print their value.
+        if (option->is_optional && option->type != ARGS__TYPE_BOOL) {
             if (is_desc_multiline) {
                 // Print default on the new line to avoid breaking it too.
                 fprintf(fp, "\n%*c", offset, ' ');
@@ -867,7 +867,7 @@ ARGS__MAYBE_UNUSED static void print_options(Args *a, FILE *fp) {
             switch (option->type) {
                 case ARGS__TYPE_LONG:     fprintf(fp, "%ld", option->default_value.long_); break;
                 case ARGS__TYPE_FLOAT:    fprintf(fp, "%.3f", option->default_value.float_); break;
-                case ARGS__TYPE_BOOL:     fprintf(fp, "%s", option->default_value.bool_ ? "true" : "false"); break;
+                case ARGS__TYPE_BOOL:     ARGS__UNREACHABLE();
                 case ARGS__TYPE_STR:
                 case ARGS__TYPE_PATH:     args__print_str_default(fp, option->default_value.str); break;
                 case ARGS__TYPE_ENUM_STR:

@@ -14,7 +14,6 @@
 //>                                to the
 //>                                second
 //>                                line
-//>                                (default: false)
 //>       --option-with-long-name  A long
 //>                                option
 //>                                (default: 12)
