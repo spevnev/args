@@ -883,6 +883,100 @@ ARGS__MAYBE_UNUSED static void print_options(Args *a, FILE *fp) {
     }
 }
 
+#ifdef __cplusplus
+class ArgsCpp {
+public:
+    ArgsCpp() : args() {}
+    ~ArgsCpp() { free_args(&args); }
+
+    // See `::option_long()`
+    ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT const long &option_long(
+        char short_name,
+        const char *long_name,
+        const char *description,
+        bool is_optional = true,
+        long default_value = 0
+    ) {
+        return *::option_long(&args, short_name, long_name, description, is_optional, default_value);
+    }
+
+    // See `::option_float()`
+    ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT const float &option_float(
+        char short_name,
+        const char *long_name,
+        const char *description,
+        bool is_optional = true,
+        float default_value = 0.0F
+    ) {
+        return *::option_float(&args, short_name, long_name, description, is_optional, default_value);
+    }
+
+    // See `::option_str()`
+    ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT const char *&option_str(
+        char short_name,
+        const char *long_name,
+        const char *description,
+        bool is_optional = true,
+        const char *default_value = nullptr
+    ) {
+        return *::option_str(&args, short_name, long_name, description, is_optional, default_value);
+    }
+
+    // See `::option_path()`
+    ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT const char *&option_path(
+        char short_name,
+        const char *long_name,
+        const char *description,
+        bool is_optional = true,
+        const char *default_value = nullptr
+    ) {
+        return *::option_path(&args, short_name, long_name, description, is_optional, default_value);
+    }
+
+    // See `::option_flag()`
+    ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT const bool &option_flag(
+        char short_name,
+        const char *long_name,
+        const char *description
+    ) {
+        return *::option_flag(&args, short_name, long_name, description);
+    }
+
+    // See `::option_enum()`
+    ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT const size_t &option_enum(
+        char short_name,
+        const char *long_name,
+        const char *description,
+        bool is_optional,
+        size_t default_value,
+        const char **values
+    ) {
+        return *::option_enum(&args, short_name, long_name, description, is_optional, default_value, values);
+    }
+
+    // See `::option_enum_str()`
+    ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT const char *&option_enum_str(
+        char short_name,
+        const char *long_name,
+        const char *description,
+        bool is_optional,
+        const char *default_value,
+        const char **values
+    ) {
+        return *::option_enum_str(&args, short_name, long_name, description, is_optional, default_value, values);
+    }
+
+    // See `::parse_args()`
+    int parse_args(int argc, char **argv, char **&pos_args) { return ::parse_args(&args, argc, argv, &pos_args); }
+
+    // See `::print_options()`
+    ARGS__MAYBE_UNUSED void print_options(FILE *fp = stdout) { ::print_options(&args, fp); }
+
+private:
+    Args args;
+};
+#endif  // __cplusplus
+
 #undef ARGS__HAS_ATTRIBUTE
 #undef ARGS__MAYBE_UNUSED
 #undef ARGS__WARN_UNUSED_RESULT

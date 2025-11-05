@@ -1,0 +1,26 @@
+If:
+    PathMatch: [examples/.*, tests/.*]
+CompileFlags:
+    Add:
+        - "-I../src"
+---
+If:
+    PathMatch: [.*\.c]
+CompileFlags:
+    Add:
+        - "-std=c99"
+---
+If:
+    PathMatch: [.*\.cc]
+CompileFlags:
+    Add:
+        - "-std=c++11"
+---
+If:
+    PathMatch: [src/args.h]
+CompileFlags:
+    Add:
+        - "-xc-header"
+        - "-std=c99"
+        # For editing C++ part:
+        # - "-std=c++11"

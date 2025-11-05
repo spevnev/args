@@ -1,15 +1,28 @@
 # args
 
-*args* is a simple single-header library for parsing command-line arguments in C.
+*args* is a simple single-header library for parsing command-line arguments in C/C++.
 
 ## Example & Usage
+
+<details>
+    <summary>C</summary>
 
 ```c
 // examples/example.c
 !examples/example.c
 ```
+</details>
 
-### Shell completion
+<details>
+    <summary>C++</summary>
+
+```cpp
+// examples/example.cc
+!examples/example.cc
+```
+</details>
+
+## Shell completion
 
 Supported shells: bash, zsh, fish.
 
@@ -40,7 +53,7 @@ PROGRAM_NAME completion fish > /usr/share/fish/vendor_completions.d/PROGRAM_NAME
 
 ## Contributing
 
-Configure git to use pre-commit hook to update README if example changes:
+Configure git to use pre-commit hook to update README when examples change:
 
 ```console
 $ git config --local core.hooksPath .githooks

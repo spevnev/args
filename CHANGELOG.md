@@ -5,6 +5,7 @@
 ### Added
 
 - Allow specifying line breaks ('\n') in description
+- C++ wrapper `ArgsCpp`
 
 ### Changed
 
