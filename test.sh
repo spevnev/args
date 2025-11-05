@@ -8,6 +8,12 @@ BLUE="\033[1;34m"
 SRC_DIR="./tests"
 OUT_DIR="./build"
 
+if [ -z "$CI" ] || [ "$RUNNER_OS" = "Linux" ]; then
+    FSANITIZE=-fsanitize=address,leak,undefined
+else
+    FSANITIZE=
+fi
+
 mkdir -p $OUT_DIR
 
 passed=0
@@ -17,7 +23,7 @@ for file in $(find $SRC_DIR -type f); do
     name=${filename%.*}
     bin="$OUT_DIR/$name"
 
-    cc -Wall -Wextra -Werror -pedantic -std=c99 -Isrc $file -o $bin 2>/dev/null
+    cc -Wall -Wextra -Werror -pedantic -std=c99 $FSANITIZE -Isrc $file -o $bin 2>/dev/null
     if [ $? -ne 0 ]; then
         echo -e $RED"[COMPILATION FAILED] $name"$RESET
         ((failed += 1))
