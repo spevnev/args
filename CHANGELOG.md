@@ -15,6 +15,7 @@
 
 - Fix `__has_attribute` check
 - Fix `print_options` printing current value instead of default
+- Fix `print_options` printing trailing whitespace after option with no default and no description
 
 ## [1.2.0](https://github.com/spevnev/args/releases/tag/v1.2.0)
 

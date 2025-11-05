@@ -798,6 +798,14 @@ ARGS__MAYBE_UNUSED static void print_options(Args *a, FILE *fp) {
 
     fprintf(fp, "Options:\n");
     for (Args__Option *option = a->head; option != NULL; option = option->next) {
+#ifdef ARGS_HIDE_DEFAULTS
+        bool print_defaults = false;
+#else
+        bool print_defaults = option->is_optional;
+        // Flag's default is always false, don't print their value.
+        if (option->type == ARGS__TYPE_BOOL) print_defaults = false;
+#endif
+
         fprintf(fp, "  ");
 
         if (option->short_name != '\0') {
@@ -807,10 +815,12 @@ ARGS__MAYBE_UNUSED static void print_options(Args *a, FILE *fp) {
         }
         fprintf(fp, "--%s", option->long_name);
 
-        int length_diff = longest_option - strlen(option->long_name);
-        fprintf(fp, "%*c", length_diff + ARGS_PADDING, ' ');
+        if (option->description != NULL || print_defaults) {
+            int length_diff = longest_option - strlen(option->long_name);
+            fprintf(fp, "%*c", length_diff + ARGS_PADDING, ' ');
+        }
 
-        ARGS__MAYBE_UNUSED bool is_desc_multiline = false;
+        bool is_desc_multiline = false;
         int offset = 8 + longest_option + ARGS_PADDING;
         // Print description and break into multiple lines if needed.
         if (option->description != NULL) {
@@ -850,9 +860,7 @@ ARGS__MAYBE_UNUSED static void print_options(Args *a, FILE *fp) {
             }
         }
 
-#ifndef ARGS_HIDE_DEFAULTS
-        // Flag's default is always false, don't print their value.
-        if (option->is_optional && option->type != ARGS__TYPE_BOOL) {
+        if (print_defaults) {
             if (is_desc_multiline) {
                 // Print default on the new line to avoid breaking it too.
                 fprintf(fp, "\n%*c", offset, ' ');
@@ -871,7 +879,6 @@ ARGS__MAYBE_UNUSED static void print_options(Args *a, FILE *fp) {
             }
             fprintf(fp, ")");
         }
-#endif
         fprintf(fp, "\n");
     }
 }
