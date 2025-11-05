@@ -47,7 +47,14 @@ for file in $(find $SRC_DIR -type f); do
     input=$(grep '//< ' $file | cut -c 5-)
     # Delete trailing CR to make results match on Windows (CRLF -> LF).
     expected_output=$(grep '//> ' $file | cut -c 5- | tr -d '\r')
-    output=$($bin $input 2>&1 | tr -d '\r')
+
+    # Mac/BSD xargs does not run command if stdin is empty.
+    if [ -z "$input" ]; then
+        output=$($bin 2>&1 | tr -d '\r')
+    else
+        output=$(echo "$input" | xargs $bin 2>&1 | tr -d '\r')
+    fi
+
     if [ $? -eq 0 ] && [ "$output" = "$expected_output" ]; then
         echo -e $GREEN"[PASSED] $name"$RESET
         ((passed += 1))

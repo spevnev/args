@@ -2,7 +2,7 @@
 #include <cstdlib>
 #include "args.h"
 
-//< -l 1 pos --enum-str=third -b --float=2.3 args -p /path --str string -e SECOND
+//< -l 1 pos --enum-str=third -b --float=2.3 args -p path --str string -e SECOND
 //> Options:
 //>   -l, --long
 //>   -f, --float
@@ -29,7 +29,7 @@ int main(int argc, char **argv) {
     assert(l == 1);
     assert(f == 2.3F);
     assert(strcmp(s, "string") == 0);
-    assert(strcmp(p, "/path") == 0);
+    assert(strcmp(p, "path") == 0);
     assert(b);
     assert(ei == 1);
     assert(strcmp(es, "third") == 0);
