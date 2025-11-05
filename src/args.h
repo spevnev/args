@@ -96,7 +96,6 @@ typedef struct {
     Args__Option *head;
     Args__Option *tail;
     char **pos_args;
-    size_t max_descr_len;
 } Args;
 
 #ifdef __has_attribute
@@ -187,9 +186,6 @@ static Args__Option *args__new_option(
             if (*c == '\t') ARGS__FATAL("Description must not contain tabs to maintain proper length");
             if (!isprint(*c)) ARGS__FATAL("Description of \"%s\" contains an invalid character 0x%x", long_name, *c);
         }
-
-        size_t length = strlen(description);
-        if (length > a->max_descr_len) a->max_descr_len = length;
     }
 
     Args__Option *option = (Args__Option *) malloc(sizeof(*option));
