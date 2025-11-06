@@ -4,13 +4,15 @@
 
 static void success(void) { _exit(EXIT_SUCCESS); }
 
-//< -o1
-//> ERROR: Short option must be separate: "-o1".
+//< -bcAd
+//> ERROR: Unknown or invalid option 'A' in "-bcAd".
 int main(int argc, char **argv) {
     atexit(success);
 
     Args a = {0};
-    (void) !option_long(&a, 'o', "opt", NULL, false, 0);
+    (void) !option_flag(&a, 'b', "optb", NULL);
+    (void) !option_flag(&a, 'c', "optc", NULL);
+    (void) !option_flag(&a, 'd', "optd", NULL);
 
     parse_args(&a, argc, argv, NULL);
 

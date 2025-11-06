@@ -5,7 +5,7 @@
 static void success(void) { _exit(EXIT_SUCCESS); }
 
 //< --unknown
-//> ERROR: Unknown or invalid option "unknown".
+//> ERROR: Unknown or invalid option "--unknown".
 int main(int argc, char **argv) {
     atexit(success);
 

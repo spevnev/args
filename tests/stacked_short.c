@@ -1,20 +1,28 @@
 #include <assert.h>
-#include <unistd.h>
 #include "args.h"
 
-static void success(void) { _exit(EXIT_SUCCESS); }
-
-//< -ab
-//> ERROR: Short option must be separate: "-ab".
+//< -cb -dl 2 -L-3 -esstring
 int main(int argc, char **argv) {
-    atexit(success);
-
     Args a = {0};
-    (void) !option_flag(&a, 'a', "opta", NULL);
-    (void) !option_flag(&a, 'b', "optb", NULL);
+    bool *b = option_flag(&a, 'b', "optb", NULL);
+    bool *c = option_flag(&a, 'c', "optc", NULL);
+    bool *d = option_flag(&a, 'd', "optd", NULL);
+    bool *e = option_flag(&a, 'e', "opte", NULL);
+    long *l = option_long(&a, 'l', "optl", NULL, false, 0);
+    long *L = option_long(&a, 'L', "optL", NULL, false, 0);
+    const char **s = option_str(&a, 's', "opts", NULL, false, NULL);
 
-    parse_args(&a, argc, argv, NULL);
+    int pos_args_len = parse_args(&a, argc, argv, NULL);
+    assert(pos_args_len == 0);
+
+    assert(*b);
+    assert(*c);
+    assert(*d);
+    assert(*e);
+    assert(*l == 2);
+    assert(*L == -3);
+    assert(strcmp(*s, "string") == 0);
 
     free_args(&a);
-    _exit(EXIT_FAILURE);
+    return EXIT_SUCCESS;
 }

@@ -692,6 +692,7 @@ static int parse_args(Args *a, int argc, char **argv, char ***pos_args) {
     while (argc > 0) {
         char *arg = *argv;
         size_t arg_len = strlen(arg);
+        ARGS__MAYBE_UNUSED const char *full_arg = arg;
         argc--;
         argv++;
 
@@ -718,7 +719,7 @@ static int parse_args(Args *a, int argc, char **argv, char ***pos_args) {
 #ifdef ARGS_SKIP_UNKNOWN
             if (option == NULL) continue;
 #else
-            if (option == NULL) ARGS__FATAL("Unknown or invalid option \"%s\"", arg);
+            if (option == NULL) ARGS__FATAL("Unknown or invalid option \"%s\"", full_arg);
 #endif
 
 #ifndef ARGS_ALLOW_OVERWRITING
@@ -744,37 +745,45 @@ static int parse_args(Args *a, int argc, char **argv, char ***pos_args) {
 
             args__parse_value(option, value);
         } else {
-            if (arg_len != 2) ARGS__FATAL("Short option must be separate: \"%s\"", arg);
+            arg++;
+            arg_len--;
+            while (arg_len > 0) {
+                char ch = *arg;
+                arg++;
+                arg_len--;
 
-            arg += 1;
-            arg_len -= 1;
-            char ch = *arg;
-
-            Args__Option *option = a->head;
-            while (option != NULL && option->short_name != ch) option = option->next;
+                Args__Option *option = a->head;
+                while (option != NULL && option->short_name != ch) option = option->next;
 
 #ifdef ARGS_SKIP_UNKNOWN
-            if (option == NULL) continue;
+                if (option == NULL) continue;
 #else
-            if (option == NULL) ARGS__FATAL("Unknown or invalid option \"%s\"", arg);
+                if (option == NULL) ARGS__FATAL("Unknown or invalid option '%c' in \"%s\"", ch, full_arg);
 #endif
 
 #ifndef ARGS_ALLOW_OVERWRITING
-            if (option->is_set) ARGS__FATAL("Option '%c' is set more than once", option->short_name);
+                if (option->is_set) ARGS__FATAL("Option '%c' is set more than once", option->short_name);
 #endif
-            option->is_set = true;
+                option->is_set = true;
 
-            if (option->type == ARGS__TYPE_BOOL) {
-                option->value.bool_ = true;
-                continue;
+                if (option->type == ARGS__TYPE_BOOL) {
+                    option->value.bool_ = true;
+                    continue;
+                }
+
+                const char *value;
+                if (arg_len > 0) {
+                    value = arg;
+                    arg_len = 0;
+                } else {
+                    if (argc == 0) ARGS__FATAL("Option '%c' is missing a value", option->short_name);
+                    value = *argv;
+                    argc--;
+                    argv++;
+                }
+
+                args__parse_value(option, value);
             }
-
-            if (argc == 0) ARGS__FATAL("Option '%c' is missing a value", option->short_name);
-            const char *value = *argv;
-            argc--;
-            argv++;
-
-            args__parse_value(option, value);
         }
     }
 

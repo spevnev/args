@@ -11,6 +11,7 @@
 
 - Make C++ compatible
 - Don't print `option_flag`'s default since it's always false
+- Allow stacked short options, e.g. `-a -b` -> `-ab`, `-s string` -> `-sstring`, `-v -l 2` -> `-vl2`.
 
 ### Fixed
 
