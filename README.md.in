@@ -8,8 +8,8 @@
     <summary>C</summary>
 
 ```c
-// examples/example.c
-!examples/example.c
+// examples/args.c
+!examples/args.c
 ```
 </details>
 
@@ -17,8 +17,8 @@
     <summary>C++</summary>
 
 ```cpp
-// examples/example.cc
-!examples/example.cc
+// examples/args_cpp.cc
+!examples/args_cpp.cc
 ```
 </details>
 

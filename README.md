@@ -8,7 +8,7 @@
     <summary>C</summary>
 
 ```c
-// examples/example.c
+// examples/args.c
 #include "args.h"
 
 int main(int argc, char **argv) {
@@ -79,7 +79,7 @@ int main(int argc, char **argv) {
     <summary>C++</summary>
 
 ```cpp
-// examples/example.cc
+// examples/args_cpp.cc
 #include "args.h"
 
 int main(int argc, char **argv) {
