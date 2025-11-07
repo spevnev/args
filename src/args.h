@@ -799,11 +799,16 @@ static int parse_args(Args *a, int argc, char **argv, char ***pos_args) {
 ARGS__MAYBE_UNUSED static void print_options(Args *a, FILE *fp) {
     ARGS__ASSERT(a != NULL && fp != NULL);
 
+    bool have_short_names = false;
     size_t longest_option = 0;
     for (Args__Option *option = a->head; option != NULL; option = option->next) {
         size_t length = strlen(option->long_name);
         if (length > longest_option) longest_option = length;
+        if (option->short_name != '\0') have_short_names = true;
     }
+
+    int offset = 4 + longest_option + ARGS_PADDING;
+    if (have_short_names) offset += 4;
 
     fprintf(fp, "Options:\n");
     for (Args__Option *option = a->head; option != NULL; option = option->next) {
@@ -819,7 +824,7 @@ ARGS__MAYBE_UNUSED static void print_options(Args *a, FILE *fp) {
 
         if (option->short_name != '\0') {
             fprintf(fp, "-%c, ", option->short_name);
-        } else {
+        } else if (have_short_names) {
             fprintf(fp, "    ");
         }
         fprintf(fp, "--%s", option->long_name);
@@ -830,7 +835,6 @@ ARGS__MAYBE_UNUSED static void print_options(Args *a, FILE *fp) {
         }
 
         bool is_desc_multiline = false;
-        int offset = 8 + longest_option + ARGS_PADDING;
         // Print description and break into multiple lines if needed.
         if (option->description != NULL) {
             int line_length = ARGS_LINE_LENGTH - offset;

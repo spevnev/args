@@ -2,8 +2,8 @@
 #include "args.h"
 
 //> Options:
-//>       --str        (default: "default \n\t\r\x07\xff")
-//>       --enum-str   (default: "default \n\t\r\x07\xff")
+//>   --str        (default: "default \n\t\r\x07\xff")
+//>   --enum-str   (default: "default \n\t\r\x07\xff")
 int main(int argc, char **argv) {
     Args a = {0};
     (void) !option_str(&a, '\0', "str", NULL, true, "default \n\t\r\a\xFF");
