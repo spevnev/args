@@ -731,9 +731,9 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const size_t *option_enum(
     char short_name,
     const char *long_name,
     const char *description,
+    const char **values,
     bool is_optional,
-    size_t default_value,
-    const char **values
+    size_t default_value
 ) {
     ARGS__ASSERT(a != NULL && values != NULL);
     Args__Option *option = args__new_option(a, short_name, long_name, description, is_optional, ARGS__TYPE_ENUM_INDEX);
@@ -758,9 +758,9 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const char **option_enum_stri
     char short_name,
     const char *long_name,
     const char *description,
+    const char **values,
     bool is_optional,
-    const char *default_value,
-    const char **values
+    const char *default_value
 ) {
     ARGS__ASSERT(a != NULL && values != NULL);
     Args__Option *option = args__new_option(a, short_name, long_name, description, is_optional, ARGS__TYPE_ENUM_STRING);
@@ -1112,11 +1112,11 @@ public:
         char short_name,
         const char *long_name,
         const char *description,
-        bool is_optional,
-        size_t default_value,
-        const char **values
+        const char **values,
+        bool is_optional = true,
+        size_t default_value = 0
     ) {
-        return *::option_enum(&args, short_name, long_name, description, is_optional, default_value, values);
+        return *::option_enum(&args, short_name, long_name, description, values, is_optional, default_value);
     }
 
     // See `::option_enum_string()`
@@ -1124,11 +1124,11 @@ public:
         char short_name,
         const char *long_name,
         const char *description,
-        bool is_optional,
-        const char *default_value,
-        const char **values
+        const char **values,
+        bool is_optional = true,
+        const char *default_value = nullptr
     ) {
-        return *::option_enum_string(&args, short_name, long_name, description, is_optional, default_value, values);
+        return *::option_enum_string(&args, short_name, long_name, description, values, is_optional, default_value);
     }
 
     // See `::parse_args()`

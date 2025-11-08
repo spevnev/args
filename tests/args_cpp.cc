@@ -20,8 +20,8 @@ int main(int argc, char **argv) {
     const auto &s = args.option_string('s', "str", nullptr, false);
     const auto &p = args.option_path('p', "path", nullptr, false);
     const auto &b = args.option_flag('b', "bool", nullptr);
-    const auto &ei = args.option_enum('e', "enum", nullptr, false, -1, ENUM_VALUES);
-    const auto &es = args.option_enum_string('E', "enum-str", nullptr, false, nullptr, ENUM_VALUES);
+    const auto &ei = args.option_enum('e', "enum", nullptr, ENUM_VALUES, false);
+    const auto &es = args.option_enum_string('E', "enum-str", nullptr, ENUM_VALUES, false);
 
     char **pos_args;
     int pos_args_len = args.parse_args(argc, argv, pos_args);

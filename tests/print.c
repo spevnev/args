@@ -18,9 +18,9 @@ int main(int argc, char **argv) {
     (void) !option_float(&a, 'f', "float", "A float option", false, 0.0F);
     (void) !option_string(&a, '\0', "str", "A string option", true, "some default");
     (void) !option_path(&a, 'p', "path", "A path option", true, NULL);
-    (void) !option_enum(&a, '\0', "enum-idx", "An index enum option", true, -1ULL, (const char *[]) {NULL});
+    (void) !option_enum(&a, '\0', "enum-idx", "An index enum option", (const char *[]) {NULL}, true, -1ULL);
     (void) !option_enum_string(
-        &a, 'e', "enum-str", "A string enum option", true, "enum default", (const char *[]) {NULL}
+        &a, 'e', "enum-str", "A string enum option", (const char *[]) {NULL}, true, "enum default"
     );
 
     parse_args(&a, argc, argv, NULL);
