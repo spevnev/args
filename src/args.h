@@ -628,7 +628,7 @@ static void free_args(Args *a) {
 // Defines a long option, returns a pointer set by `parse_args`.
 // Use '\0' for no short name.
 // Exits if `a` or `long_name` is NULL, or out of memory.
-ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static long *option_long(
+ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const long *option_long(
     Args *a,
     char short_name,
     const char *long_name,
@@ -645,7 +645,7 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static long *option_long(
 // Defines a float option, returns a pointer set by `parse_args`.
 // Use '\0' for no short name.
 // Exits if `a` or `long_name` is NULL, or out of memory.
-ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static float *option_float(
+ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const float *option_float(
     Args *a,
     char short_name,
     const char *long_name,
@@ -709,7 +709,7 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const char **option_path(
 // Defines a boolean flag, returns a pointer set by `parse_args`.
 // Use '\0' for no short name.
 // Exits if `a` or `long_name` is NULL, or out of memory.
-ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static bool *option_flag(
+ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const bool *option_flag(
     Args *a,
     char short_name,
     const char *long_name,
@@ -726,7 +726,7 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static bool *option_flag(
 // `values` must be a NULL-terminated array, matched case-insensitively.
 // Use '\0' for no short name.
 // Exits if `a`, `long_name`, or `values` is NULL, or out of memory.
-ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static size_t *option_enum(
+ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const size_t *option_enum(
     Args *a,
     char short_name,
     const char *long_name,

@@ -4,12 +4,12 @@
 //< -cb -dl 2 -L-3 -esstring
 int main(int argc, char **argv) {
     Args a = {0};
-    bool *b = option_flag(&a, 'b', "optb", NULL);
-    bool *c = option_flag(&a, 'c', "optc", NULL);
-    bool *d = option_flag(&a, 'd', "optd", NULL);
-    bool *e = option_flag(&a, 'e', "opte", NULL);
-    long *l = option_long(&a, 'l', "optl", NULL, false, 0);
-    long *L = option_long(&a, 'L', "optL", NULL, false, 0);
+    const bool *b = option_flag(&a, 'b', "optb", NULL);
+    const bool *c = option_flag(&a, 'c', "optc", NULL);
+    const bool *d = option_flag(&a, 'd', "optd", NULL);
+    const bool *e = option_flag(&a, 'e', "opte", NULL);
+    const long *l = option_long(&a, 'l', "optl", NULL, false, 0);
+    const long *L = option_long(&a, 'L', "optL", NULL, false, 0);
     const char **s = option_str(&a, 's', "opts", NULL, false, NULL);
 
     int pos_args_len = parse_args(&a, argc, argv, NULL);

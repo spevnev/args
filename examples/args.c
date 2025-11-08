@@ -5,10 +5,10 @@ int main(int argc, char **argv) {
     Args a = {0};
 
     // Define options.
-    bool *help = option_flag(&a, 'h', "help", "Show help");
-    bool *version = option_flag(&a, 'v', "version", "Print version");
-    long *l = option_long(&a, 'l', "long", "A long option", true, 0);
-    float *f = option_float(&a, 'f', "float", "A float option", true, 0.0F);
+    const bool *help = option_flag(&a, 'h', "help", "Show help");
+    const bool *version = option_flag(&a, 'v', "version", "Print version");
+    const long *l = option_long(&a, 'l', "long", "A long option", true, 0);
+    const float *f = option_float(&a, 'f', "float", "A float option", true, 0.0F);
     const char **s = option_str(&a, 's', "str", "A string option", true, NULL);
     const char **p = option_path(&a, 'p', "path", "A path option", true, NULL);
 

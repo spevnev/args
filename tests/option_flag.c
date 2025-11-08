@@ -4,9 +4,9 @@
 //< --long1 -s
 int main(int argc, char **argv) {
     Args a = {0};
-    bool *l = option_flag(&a, '\0', "long1", NULL);
-    bool *s = option_flag(&a, 's', "long2", NULL);
-    bool *d = option_flag(&a, '\0', "long3", NULL);
+    const bool *l = option_flag(&a, '\0', "long1", NULL);
+    const bool *s = option_flag(&a, 's', "long2", NULL);
+    const bool *d = option_flag(&a, '\0', "long3", NULL);
 
     int pos_args_len = parse_args(&a, argc, argv, NULL);
     assert(pos_args_len == 0);
