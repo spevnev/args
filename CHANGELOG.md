@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## [1.3.0](https://github.com/spevnev/args/releases/tag/v1.3.0)
 
 ### Added
 

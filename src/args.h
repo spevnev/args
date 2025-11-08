@@ -1,4 +1,4 @@
-// args v1.2.0
+// args v1.3.0
 // Documentation, examples, and issues: https://github.com/spevnev/args
 
 // MIT License

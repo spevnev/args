@@ -39,7 +39,7 @@ int main(int argc, char **argv) {
 
     // Similarly, print version on flag or subcommand.
     if (version || (pos_args_len == 1 && strcmp(pos_args[0], "version") == 0)) {
-        printf("v1.2.0\n");
+        printf("v1.3.0\n");
         return EXIT_SUCCESS;
     }
 
