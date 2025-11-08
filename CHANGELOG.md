@@ -10,8 +10,9 @@
 ### Changed
 
 - Make C++ compatible
-- Don't print `option_flag`'s default since it's always false
+- Improve bash completion: add descriptions, suggest values
 - Allow stacked short options, e.g. `-a -b` -> `-ab`, `-s string` -> `-sstring`, `-v -l 2` -> `-vl2`.
+- Don't print `option_flag`'s default since it's always false
 
 ### Fixed
 

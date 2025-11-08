@@ -69,6 +69,7 @@ typedef struct Args__Option {
     char *description;
     bool is_optional;
     bool is_set;
+    bool is_matching;
     Args__Type type;
     union {
         long long_;
@@ -96,6 +97,8 @@ typedef struct {
     Args__Option *head;
     Args__Option *tail;
     char **pos_args;
+    bool opt_have_short_name;
+    size_t opt_max_name_length;
 } Args;
 
 #ifdef __has_attribute
@@ -196,7 +199,12 @@ static Args__Option *args__new_option(
     option->description = description == NULL ? NULL : args__strdup(description);
     option->is_optional = is_optional;
     option->is_set = false;
+    option->is_matching = false;
     option->type = type;
+
+    size_t name_len = strlen(option->long_name);
+    if (name_len > a->opt_max_name_length) a->opt_max_name_length = name_len;
+    if (short_name != '\0') a->opt_have_short_name = true;
 
     if (a->head == NULL) {
         a->head = option;
@@ -315,12 +323,17 @@ static void args__completion_bash_print(const char *program_name) {
         "    local cur prev words cword\n"
         "    _init_completion || return\n"
         "\n"
-        "    if [[ $cur == -* ]]; then\n"
-        "        COMPREPLY=($(compgen -W \"$(%s __complete bash 2>/dev/null)\" -- \"$cur\"))\n"
+        "    local IFS=$'\\n'\n"
+        "    COMPREPLY=( $(%s __complete bash \"$prev\" \"$cur\" \"$COLUMNS\" 2>/dev/null) )\n"
+        "\n"
+        "    if [[ ${#COMPREPLY[@]} -eq 1 && \"${COMPREPLY[0]}\" == \"-\" ]]; then\n"
+        "        COMPREPLY=()\n"
+        "    elif [[ ${#COMPREPLY[@]} -eq 0 ]]; then\n"
+        "        COMPREPLY=( $(compgen -o default -- \"$cur\") )\n"
         "    fi\n"
         "}\n"
         "\n"
-        "complete -o default -F _%s %s\n",
+        "complete -F _%s %s\n",
         program_name, program_name, program_name, program_name
     );
 }
@@ -352,13 +365,154 @@ static void args__completion_fish_print(const char *program_name) {
     );
 }
 
-static void args__completion_bash_complete(Args *a) {
-    ARGS__ASSERT(a != NULL);
-    for (Args__Option *i = a->head; i != NULL; i = i->next) {
-        if (i->short_name != '\0') printf("-%c ", i->short_name);
-        printf("--%s ", i->long_name);
+static void args__completion_bash_complete(Args *a, const char *prev, const char *cur, const char *columns_str) {
+    ARGS__ASSERT(a != NULL && prev != NULL && cur != NULL && columns_str != NULL);
+
+    size_t cur_length = strlen(cur);
+    if (cur_length >= 1 && cur[0] == '-') {
+        char *end = NULL;
+        int columns = strtol(columns_str, &end, 0) - 1;
+        if (end == NULL || *end != '\0' || columns <= 0) ARGS__FATAL("Invalid columns \"%s\"", columns_str);
+
+        bool print_short = true;
+        bool print_long = true;
+
+        // Chooses which options to print by setting `is_matching`.
+        if (cur_length == 1) {
+            for (Args__Option *i = a->head; i != NULL; i = i->next) i->is_matching = true;
+        } else if (cur[1] == '-') {
+            const char *name = cur + 2;
+            size_t name_length = cur_length - 2;
+            for (Args__Option *i = a->head; i != NULL; i = i->next) {
+                if (strlen(i->long_name) >= name_length && strncmp(i->long_name, name, name_length) == 0) {
+                    i->is_matching = true;
+                }
+            }
+            print_short = false;
+        } else if (cur_length == 2) {
+            char name = cur[1];
+            for (Args__Option *i = a->head; i != NULL; i = i->next) {
+                if (i->short_name == name) {
+                    i->is_matching = true;
+                    break;
+                }
+            }
+            print_long = false;
+        }
+
+        int matches = 0;
+        for (Args__Option *i = a->head; i != NULL; i = i->next) {
+            if (i->is_matching) matches++;
+        }
+
+        // Print matching options.
+        bool is_first = true;
+        for (Args__Option *i = a->head; i != NULL; i = i->next) {
+            if (!i->is_matching) continue;
+
+            int length = 0;
+            if (print_short && a->opt_have_short_name) {
+                if (i->short_name != '\0') {
+                    printf("-%c", i->short_name);
+                    if (print_long) printf(", ");
+                } else {
+                    printf("  ");
+                    if (print_long) printf("  ");
+                }
+
+                length += 2;
+                if (print_short) length += 2;
+            }
+
+            int padding = 0;
+            if (print_long) {
+                printf("--%s", i->long_name);
+                size_t opt_length = strlen(i->long_name);
+                padding = a->opt_max_name_length - opt_length;
+                length += 2 + opt_length;
+            }
+
+            // When there is only one completion, bash will immediately append it to
+            // the current command, don't print description or it will be used too.
+            if (matches > 1) {
+                if (padding > 0) {
+                    printf("%*c", padding, ' ');
+                    length += padding;
+                }
+
+                if (i->description != NULL) {
+                    printf(" -- ");
+                    args__completion_print_escaped(i->description, "");
+                    length += 4 + strlen(i->description);
+                }
+
+                // Force bash to display options in a column by padding it to a line width.
+                if (is_first && length < columns) printf("%*c", columns - length, ' ');
+                is_first = false;
+            }
+            printf("\n");
+        }
+        return;
     }
-    printf("\n");
+
+    size_t prev_length = strlen(prev);
+    if (prev_length >= 2 && prev[0] == '-') {
+        Args__Option *option = NULL;
+        if (prev[1] == '-') {
+            const char *name = prev + 2;
+            size_t name_length = strlen(name);
+            for (Args__Option *i = a->head; i != NULL; i = i->next) {
+                if (strlen(i->long_name) == name_length && strncmp(i->long_name, name, name_length) == 0) {
+                    option = i;
+                    break;
+                }
+            }
+        } else {
+            // Handle stacked short options. We cannot just take the last char because it can be a value.
+            // e.g. `--str string` -> `-sstring`. Last char, `g`, is value, not an option.
+            size_t idx = 1;
+            while (true) {
+                // Find current option if any.
+                Args__Option *current_option = NULL;
+                for (Args__Option *i = a->head; i != NULL; i = i->next) {
+                    if (i->short_name == prev[idx]) {
+                        current_option = i;
+                        break;
+                    }
+                }
+                if (current_option == NULL) return;
+
+                // It is the last one, complete it's value.
+                if (idx + 1 >= prev_length) {
+                    option = current_option;
+                    break;
+                }
+
+                // If it's a flag, check the next option,
+                // otherwise, it's value is already provided, exit.
+                if (current_option->type != ARGS__TYPE_BOOL) return;
+                idx++;
+            }
+        }
+        if (option == NULL) return;
+
+        switch (option->type) {
+            case ARGS__TYPE_LONG:
+            case ARGS__TYPE_FLOAT:
+            case ARGS__TYPE_BOOL:
+            case ARGS__TYPE_STR:   printf("-\n"); break;
+            case ARGS__TYPE_PATH:  break;
+            case ARGS__TYPE_ENUM_IDX:
+            case ARGS__TYPE_ENUM_STR:
+                for (size_t i = 0; i < option->value.enum_.length; i++) {
+                    const char *value = option->value.enum_.values[i];
+                    if (strlen(value) >= cur_length && strncmp(value, cur, cur_length) == 0) {
+                        printf("%s\n", value);
+                    }
+                }
+                break;
+        }
+    }
 }
 
 static void args__completion_zsh_print_option_details(Args__Option *option) {
@@ -437,30 +591,30 @@ static void args__completion_fish_complete(Args *a) {
 static void free_args(Args *a) {
     if (a == NULL) return;
 
-    Args__Option *current = a->head;
-    while (current != NULL) {
-        switch (current->type) {
+    Args__Option *cur = a->head;
+    while (cur != NULL) {
+        switch (cur->type) {
             case ARGS__TYPE_LONG:
             case ARGS__TYPE_FLOAT:
             case ARGS__TYPE_BOOL:  break;
             case ARGS__TYPE_STR:
             case ARGS__TYPE_PATH:
-                free(current->default_value.str);
-                free(current->value.str);
+                free(cur->default_value.str);
+                free(cur->value.str);
                 break;
             case ARGS__TYPE_ENUM_STR:
             case ARGS__TYPE_ENUM_IDX:
-                free(current->default_value.enum_);
-                for (size_t i = 0; i < current->value.enum_.length; i++) free(current->value.enum_.values[i]);
-                free(current->value.enum_.values);
+                free(cur->default_value.enum_);
+                for (size_t i = 0; i < cur->value.enum_.length; i++) free(cur->value.enum_.values[i]);
+                free(cur->value.enum_.values);
                 break;
         }
-        free(current->long_name);
-        free(current->description);
+        free(cur->long_name);
+        free(cur->description);
 
-        Args__Option *next = current->next;
-        free(current);
-        current = next;
+        Args__Option *next = cur->next;
+        free(cur);
+        cur = next;
     }
     a->head = NULL;
     a->tail = NULL;
@@ -644,7 +798,7 @@ static int parse_args(Args *a, int argc, char **argv, char ***pos_args) {
 
 #ifndef ARGS_DISABLE_COMPLETION
     if (argc >= 1 && strcmp(argv[0], "completion") == 0) {
-        if (argc == 1) ARGS__FATAL("Command 'completion' requires an argument: bash, zsh, fish");
+        if (argc != 2) ARGS__FATAL("Command 'completion' requires an argument: bash, zsh, fish");
 
         for (const char *c = program_name; *c != '\0'; c++) {
             if (isalnum(*c) || *c == '_' || *c == '.' || *c == '+' || *c == ':') continue;
@@ -669,10 +823,13 @@ static int parse_args(Args *a, int argc, char **argv, char ***pos_args) {
         if (argc == 1) ARGS__FATAL("Command '__complete' requires an argument: bash, zsh, fish");
 
         if (strcmp(argv[1], "bash") == 0) {
-            args__completion_bash_complete(a);
+            if (argc != 5) ARGS__FATAL("Command '__complete bash' requires arguments '<prev> <cur> <columns>'");
+            args__completion_bash_complete(a, argv[2], argv[3], argv[4]);
         } else if (strcmp(argv[1], "zsh") == 0) {
+            if (argc > 2) ARGS__FATAL("Command '__complete zsh' doesn't take arguments");
             args__completion_zsh_complete(a);
         } else if (strcmp(argv[1], "fish") == 0) {
+            if (argc > 2) ARGS__FATAL("Command '__complete fish' doesn't take arguments");
             args__completion_fish_complete(a);
         } else {
             ARGS__FATAL("Failed to generate completions: unknown shell \"%s\"", argv[1]);
@@ -799,16 +956,8 @@ static int parse_args(Args *a, int argc, char **argv, char ***pos_args) {
 ARGS__MAYBE_UNUSED static void print_options(Args *a, FILE *fp) {
     ARGS__ASSERT(a != NULL && fp != NULL);
 
-    bool have_short_names = false;
-    size_t longest_option = 0;
-    for (Args__Option *option = a->head; option != NULL; option = option->next) {
-        size_t length = strlen(option->long_name);
-        if (length > longest_option) longest_option = length;
-        if (option->short_name != '\0') have_short_names = true;
-    }
-
-    int offset = 4 + longest_option + ARGS_PADDING;
-    if (have_short_names) offset += 4;
+    int offset = 4 + a->opt_max_name_length + ARGS_PADDING;
+    if (a->opt_have_short_name) offset += 4;
 
     fprintf(fp, "Options:\n");
     for (Args__Option *option = a->head; option != NULL; option = option->next) {
@@ -824,13 +973,13 @@ ARGS__MAYBE_UNUSED static void print_options(Args *a, FILE *fp) {
 
         if (option->short_name != '\0') {
             fprintf(fp, "-%c, ", option->short_name);
-        } else if (have_short_names) {
+        } else if (a->opt_have_short_name) {
             fprintf(fp, "    ");
         }
         fprintf(fp, "--%s", option->long_name);
 
         if (option->description != NULL || print_defaults) {
-            int length_diff = longest_option - strlen(option->long_name);
+            int length_diff = a->opt_max_name_length - strlen(option->long_name);
             fprintf(fp, "%*c", length_diff + ARGS_PADDING, ' ');
         }
 
