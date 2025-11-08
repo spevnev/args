@@ -55,11 +55,11 @@
 typedef enum {
     ARGS__TYPE_LONG,
     ARGS__TYPE_FLOAT,
-    ARGS__TYPE_STR,
+    ARGS__TYPE_STRING,
     ARGS__TYPE_PATH,
     ARGS__TYPE_BOOL,
-    ARGS__TYPE_ENUM_IDX,
-    ARGS__TYPE_ENUM_STR,
+    ARGS__TYPE_ENUM_INDEX,
+    ARGS__TYPE_ENUM_STRING,
 } Args__Type;
 
 typedef struct Args__Option {
@@ -74,13 +74,13 @@ typedef struct Args__Option {
     union {
         long long_;
         float float_;
-        char *str;
+        char *string;
         char *enum_;
     } default_value;
     union {
         long long_;
         float float_;
-        char *str;
+        char *string;
         bool bool_;
         struct {
             char **values;
@@ -96,9 +96,9 @@ typedef struct Args__Option {
 typedef struct {
     Args__Option *head;
     Args__Option *tail;
-    char **pos_args;
-    bool opt_have_short_name;
-    size_t opt_max_name_length;
+    char **positional_args;
+    bool options_have_short_name;
+    size_t options_max_name_length;
 } Args;
 
 #ifdef __has_attribute
@@ -137,14 +137,14 @@ typedef struct {
         }                                                                               \
     } while (0)
 
-static char *args__strdup(const char *str) {
-    ARGS__ASSERT(str != NULL);
-    size_t len = strlen(str);
-    char *dup = (char *) malloc(len + 1);
-    if (dup == NULL) ARGS__OUT_OF_MEMORY();
-    memcpy(dup, str, len);
-    dup[len] = '\0';
-    return dup;
+static char *args__strdup(const char *string) {
+    ARGS__ASSERT(string != NULL);
+    size_t length = strlen(string);
+    char *copy = (char *) malloc(length + 1);
+    if (copy == NULL) ARGS__OUT_OF_MEMORY();
+    memcpy(copy, string, length);
+    copy[length] = '\0';
+    return copy;
 }
 
 static const char *args__basename(const char *path) {
@@ -202,9 +202,9 @@ static Args__Option *args__new_option(
     option->is_matching = false;
     option->type = type;
 
-    size_t name_len = strlen(option->long_name);
-    if (name_len > a->opt_max_name_length) a->opt_max_name_length = name_len;
-    if (short_name != '\0') a->opt_have_short_name = true;
+    size_t name_length = strlen(option->long_name);
+    if (name_length > a->options_max_name_length) a->options_max_name_length = name_length;
+    if (short_name != '\0') a->options_have_short_name = true;
 
     if (a->head == NULL) {
         a->head = option;
@@ -222,9 +222,9 @@ static void args__set_enum_values(Args__Option *option, const char **values) {
     while (values[length] != NULL) length++;
     option->value.enum_.length = length;
 
-    char **dup = (char **) malloc(sizeof(*dup) * length);
-    if (dup == NULL) ARGS__OUT_OF_MEMORY();
-    option->value.enum_.values = dup;
+    char **copy = (char **) malloc(sizeof(*copy) * length);
+    if (copy == NULL) ARGS__OUT_OF_MEMORY();
+    option->value.enum_.values = copy;
 
     for (size_t i = 0; i < length; i++) {
         for (const char *c = values[i]; *c != '\0'; c++) {
@@ -236,7 +236,7 @@ static void args__set_enum_values(Args__Option *option, const char **values) {
                 );
             }
         }
-        dup[i] = args__strdup(values[i]);
+        copy[i] = args__strdup(values[i]);
     }
 }
 
@@ -253,18 +253,18 @@ static void args__parse_value(Args__Option *option, const char *value) {
             option->value.float_ = strtof(value, &end);
             if (end == NULL || *end != '\0') ARGS__FATAL("Invalid float \"%s\"", value);
         } break;
-        case ARGS__TYPE_STR:
+        case ARGS__TYPE_STRING:
         case ARGS__TYPE_PATH:
-            free(option->value.str);
-            option->value.str = args__strdup(value);
+            free(option->value.string);
+            option->value.string = args__strdup(value);
             break;
         case ARGS__TYPE_BOOL: ARGS__UNREACHABLE(); break;
-        case ARGS__TYPE_ENUM_IDX:
-        case ARGS__TYPE_ENUM_STR:
+        case ARGS__TYPE_ENUM_INDEX:
+        case ARGS__TYPE_ENUM_STRING:
             for (size_t i = 0; i < option->value.enum_.length; i++) {
                 if (strcasecmp(option->value.enum_.values[i], value) != 0) continue;
 
-                if (option->type == ARGS__TYPE_ENUM_IDX) {
+                if (option->type == ARGS__TYPE_ENUM_INDEX) {
                     option->value.enum_.as.index = i;
                 } else {
                     option->value.enum_.as.value = option->value.enum_.values[i];
@@ -275,16 +275,16 @@ static void args__parse_value(Args__Option *option, const char *value) {
     }
 }
 
-ARGS__MAYBE_UNUSED static void args__print_str_default(FILE *fp, const char *str) {
+ARGS__MAYBE_UNUSED static void args__print_string_value(FILE *fp, const char *string) {
     ARGS__ASSERT(fp != NULL);
 
-    if (str == NULL) {
+    if (string == NULL) {
         fprintf(fp, "none");
         return;
     }
 
     fprintf(fp, "\"");
-    for (const char *c = str; *c != '\0'; c++) {
+    for (const char *c = string; *c != '\0'; c++) {
         switch (*c) {
             case '\n': fprintf(fp, "\\n"); break;
             case '\r': fprintf(fp, "\\r"); break;
@@ -302,11 +302,11 @@ ARGS__MAYBE_UNUSED static void args__print_str_default(FILE *fp, const char *str
 }
 
 #ifndef ARGS_DISABLE_COMPLETION
-// Prints strings with '\' and chars in `escaped_chars` escaped with '\'.
+// Prints string with '\' and chars in `escaped_chars` escaped with '\'.
 // Replaces '\n' with ' '.
-static void args__completion_print_escaped(const char *str, const char *escaped_chars) {
-    ARGS__ASSERT(str != NULL && escaped_chars != NULL);
-    for (const char *c = str; *c != '\0'; c++) {
+static void args__completion_print_escaped(const char *string, const char *escaped_chars) {
+    ARGS__ASSERT(string != NULL && escaped_chars != NULL);
+    for (const char *c = string; *c != '\0'; c++) {
         if (*c == '\n') {
             printf(" ");
         } else {
@@ -316,7 +316,7 @@ static void args__completion_print_escaped(const char *str, const char *escaped_
     }
 }
 
-static void args__completion_bash_print(const char *program_name) {
+static void args__bash_completion_script(const char *program_name) {
     ARGS__ASSERT(program_name != NULL);
     printf(
         "_%s() {\n"
@@ -338,7 +338,7 @@ static void args__completion_bash_print(const char *program_name) {
     );
 }
 
-static void args__completion_zsh_print(const char *program_name) {
+static void args__zsh_completion_script(const char *program_name) {
     ARGS__ASSERT(program_name != NULL);
     printf(
         "#compdef %s\n"
@@ -353,7 +353,7 @@ static void args__completion_zsh_print(const char *program_name) {
     );
 }
 
-static void args__completion_fish_print(const char *program_name) {
+static void args__fish_completion_script(const char *program_name) {
     ARGS__ASSERT(program_name != NULL);
     printf(
         "complete -c %s -e\n"
@@ -365,19 +365,18 @@ static void args__completion_fish_print(const char *program_name) {
     );
 }
 
-static void args__completion_bash_complete(Args *a, const char *prev, const char *cur, const char *columns_str) {
-    ARGS__ASSERT(a != NULL && prev != NULL && cur != NULL && columns_str != NULL);
+static void args__bash_complete(Args *a, const char *prev, const char *cur, const char *columns_string) {
+    ARGS__ASSERT(a != NULL && prev != NULL && cur != NULL && columns_string != NULL);
 
     size_t cur_length = strlen(cur);
     if (cur_length >= 1 && cur[0] == '-') {
         char *end = NULL;
-        int columns = strtol(columns_str, &end, 0) - 1;
-        if (end == NULL || *end != '\0' || columns <= 0) ARGS__FATAL("Invalid columns \"%s\"", columns_str);
-
-        bool print_short = true;
-        bool print_long = true;
+        int columns = strtol(columns_string, &end, 0) - 1;
+        if (end == NULL || *end != '\0' || columns <= 0) ARGS__FATAL("Invalid columns \"%s\"", columns_string);
 
         // Chooses which options to print by setting `is_matching`.
+        bool print_short = true;
+        bool print_long = true;
         if (cur_length == 1) {
             for (Args__Option *i = a->head; i != NULL; i = i->next) i->is_matching = true;
         } else if (cur[1] == '-') {
@@ -411,7 +410,7 @@ static void args__completion_bash_complete(Args *a, const char *prev, const char
             if (!i->is_matching) continue;
 
             int length = 0;
-            if (print_short && a->opt_have_short_name) {
+            if (print_short && a->options_have_short_name) {
                 if (i->short_name != '\0') {
                     printf("-%c", i->short_name);
                     if (print_long) printf(", ");
@@ -427,9 +426,9 @@ static void args__completion_bash_complete(Args *a, const char *prev, const char
             int padding = 0;
             if (print_long) {
                 printf("--%s", i->long_name);
-                size_t opt_length = strlen(i->long_name);
-                padding = a->opt_max_name_length - opt_length;
-                length += 2 + opt_length;
+                size_t name_length = strlen(i->long_name);
+                padding = a->options_max_name_length - name_length;
+                length += 2 + name_length;
             }
 
             // When there is only one completion, bash will immediately append it to
@@ -470,12 +469,12 @@ static void args__completion_bash_complete(Args *a, const char *prev, const char
         } else {
             // Handle stacked short options. We cannot just take the last char because it can be a value.
             // e.g. `--str string` -> `-sstring`. Last char, `g`, is value, not an option.
-            size_t idx = 1;
+            size_t index = 1;
             while (true) {
                 // Find current option if any.
                 Args__Option *current_option = NULL;
                 for (Args__Option *i = a->head; i != NULL; i = i->next) {
-                    if (i->short_name == prev[idx]) {
+                    if (i->short_name == prev[index]) {
                         current_option = i;
                         break;
                     }
@@ -483,7 +482,7 @@ static void args__completion_bash_complete(Args *a, const char *prev, const char
                 if (current_option == NULL) return;
 
                 // It is the last one, complete it's value.
-                if (idx + 1 >= prev_length) {
+                if (index + 1 >= prev_length) {
                     option = current_option;
                     break;
                 }
@@ -491,7 +490,7 @@ static void args__completion_bash_complete(Args *a, const char *prev, const char
                 // If it's a flag, check the next option,
                 // otherwise, it's value is already provided, exit.
                 if (current_option->type != ARGS__TYPE_BOOL) return;
-                idx++;
+                index++;
             }
         }
         if (option == NULL) return;
@@ -500,10 +499,10 @@ static void args__completion_bash_complete(Args *a, const char *prev, const char
             case ARGS__TYPE_LONG:
             case ARGS__TYPE_FLOAT:
             case ARGS__TYPE_BOOL:
-            case ARGS__TYPE_STR:   printf("-\n"); break;
-            case ARGS__TYPE_PATH:  break;
-            case ARGS__TYPE_ENUM_IDX:
-            case ARGS__TYPE_ENUM_STR:
+            case ARGS__TYPE_STRING: printf("-\n"); break;
+            case ARGS__TYPE_PATH:   break;
+            case ARGS__TYPE_ENUM_INDEX:
+            case ARGS__TYPE_ENUM_STRING:
                 for (size_t i = 0; i < option->value.enum_.length; i++) {
                     const char *value = option->value.enum_.values[i];
                     if (strlen(value) >= cur_length && strncmp(value, cur, cur_length) == 0) {
@@ -515,7 +514,7 @@ static void args__completion_bash_complete(Args *a, const char *prev, const char
     }
 }
 
-static void args__completion_zsh_print_option_details(Args__Option *option) {
+static void args__zsh_print_option_details(Args__Option *option) {
     ARGS__ASSERT(option != NULL);
 
     if (option->description != NULL) {
@@ -526,8 +525,8 @@ static void args__completion_zsh_print_option_details(Args__Option *option) {
 
     switch (option->type) {
         case ARGS__TYPE_PATH: printf(":path:_files"); break;
-        case ARGS__TYPE_ENUM_IDX:
-        case ARGS__TYPE_ENUM_STR:
+        case ARGS__TYPE_ENUM_INDEX:
+        case ARGS__TYPE_ENUM_STRING:
             printf(":%s:(", option->long_name);
             for (size_t i = 0; i < option->value.enum_.length; i++) {
                 if (i > 0) printf(" ");
@@ -540,28 +539,28 @@ static void args__completion_zsh_print_option_details(Args__Option *option) {
     printf("\n");
 }
 
-static void args__completion_zsh_complete(Args *a) {
+static void args__zsh_complete(Args *a) {
     ARGS__ASSERT(a != NULL);
     for (Args__Option *i = a->head; i != NULL; i = i->next) {
         if (i->short_name != '\0') {
             printf("(-%c --%s)-%c", i->short_name, i->long_name, i->short_name);
-            args__completion_zsh_print_option_details(i);
+            args__zsh_print_option_details(i);
 
             printf("(-%c --%s)", i->short_name, i->long_name);
         }
         printf("--%s", i->long_name);
         if (i->type != ARGS__TYPE_BOOL) printf("=");
-        args__completion_zsh_print_option_details(i);
+        args__zsh_print_option_details(i);
     }
     // Set default completion of positional arguments to path.
     printf("*:file:_files\n");
 }
 
-static void args__completion_fish_complete(Args *a) {
+static void args__fish_complete(Args *a) {
     ARGS__ASSERT(a != NULL);
     for (Args__Option *i = a->head; i != NULL; i = i->next) {
         printf("-l %s -%c", i->long_name, i->type == ARGS__TYPE_PATH ? 'F' : 'f');
-        if (i->type == ARGS__TYPE_ENUM_IDX || i->type == ARGS__TYPE_ENUM_STR) {
+        if (i->type == ARGS__TYPE_ENUM_INDEX || i->type == ARGS__TYPE_ENUM_STRING) {
             printf(" -a '");
             for (size_t j = 0; j < i->value.enum_.length; j++) {
                 if (j > 0) printf(" ");
@@ -597,13 +596,13 @@ static void free_args(Args *a) {
             case ARGS__TYPE_LONG:
             case ARGS__TYPE_FLOAT:
             case ARGS__TYPE_BOOL:  break;
-            case ARGS__TYPE_STR:
+            case ARGS__TYPE_STRING:
             case ARGS__TYPE_PATH:
-                free(cur->default_value.str);
-                free(cur->value.str);
+                free(cur->default_value.string);
+                free(cur->value.string);
                 break;
-            case ARGS__TYPE_ENUM_STR:
-            case ARGS__TYPE_ENUM_IDX:
+            case ARGS__TYPE_ENUM_STRING:
+            case ARGS__TYPE_ENUM_INDEX:
                 free(cur->default_value.enum_);
                 for (size_t i = 0; i < cur->value.enum_.length; i++) free(cur->value.enum_.values[i]);
                 free(cur->value.enum_.values);
@@ -619,8 +618,8 @@ static void free_args(Args *a) {
     a->head = NULL;
     a->tail = NULL;
 
-    free(a->pos_args);
-    a->pos_args = NULL;
+    free(a->positional_args);
+    a->positional_args = NULL;
 }
 
 // Defines a long option, returns a pointer set by `parse_args`.
@@ -671,15 +670,15 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const char **option_str(
     const char *default_value
 ) {
     ARGS__ASSERT(a != NULL);
-    Args__Option *option = args__new_option(a, short_name, long_name, description, is_optional, ARGS__TYPE_STR);
+    Args__Option *option = args__new_option(a, short_name, long_name, description, is_optional, ARGS__TYPE_STRING);
     if (default_value == NULL) {
-        option->default_value.str = NULL;
-        option->value.str = NULL;
+        option->default_value.string = NULL;
+        option->value.string = NULL;
     } else {
-        option->default_value.str = args__strdup(default_value);
-        option->value.str = args__strdup(default_value);
+        option->default_value.string = args__strdup(default_value);
+        option->value.string = args__strdup(default_value);
     }
-    return (const char **) &option->value.str;
+    return (const char **) &option->value.string;
 }
 
 // Same as `option_str` except that shell completion will suggest paths.
@@ -695,13 +694,13 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const char **option_path(
     ARGS__ASSERT(a != NULL);
     Args__Option *option = args__new_option(a, short_name, long_name, description, is_optional, ARGS__TYPE_PATH);
     if (default_value == NULL) {
-        option->default_value.str = NULL;
-        option->value.str = NULL;
+        option->default_value.string = NULL;
+        option->value.string = NULL;
     } else {
-        option->default_value.str = args__strdup(default_value);
-        option->value.str = args__strdup(default_value);
+        option->default_value.string = args__strdup(default_value);
+        option->value.string = args__strdup(default_value);
     }
-    return (const char **) &option->value.str;
+    return (const char **) &option->value.string;
 }
 
 // Defines a boolean flag, returns a pointer set by `parse_args`.
@@ -734,7 +733,7 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static size_t *option_enum(
     const char **values
 ) {
     ARGS__ASSERT(a != NULL && values != NULL);
-    Args__Option *option = args__new_option(a, short_name, long_name, description, is_optional, ARGS__TYPE_ENUM_IDX);
+    Args__Option *option = args__new_option(a, short_name, long_name, description, is_optional, ARGS__TYPE_ENUM_INDEX);
     args__set_enum_values(option, values);
     option->value.enum_.as.index = default_value;
     if (default_value < option->value.enum_.length) {
@@ -761,7 +760,7 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const char **option_enum_str(
     const char **values
 ) {
     ARGS__ASSERT(a != NULL && values != NULL);
-    Args__Option *option = args__new_option(a, short_name, long_name, description, is_optional, ARGS__TYPE_ENUM_STR);
+    Args__Option *option = args__new_option(a, short_name, long_name, description, is_optional, ARGS__TYPE_ENUM_STRING);
     option->default_value.enum_ = default_value == NULL ? NULL : args__strdup(default_value);
     args__set_enum_values(option, values);
     option->value.enum_.as.value = option->default_value.enum_;
@@ -771,10 +770,10 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const char **option_enum_str(
 // Parses arguments, sets option-returned values.
 // Unless disabled, handles shell completion by writing to stdout and exiting.
 // Must be called before side effects or stdout output.
-// Returns positional arguments via `pos_args`, and their count as return value.
+// Returns positional arguments via `positional_args`, and their count as return value.
 // Elements are from `argv`, while the array memory is managed by library.
 // On error, prints to stderr and exits.
-static int parse_args(Args *a, int argc, char **argv, char ***pos_args) {
+static int parse_args(Args *a, int argc, char **argv, char ***positional_args) {
     ARGS__ASSERT(a != NULL && argv != NULL);
 
     ARGS__ASSERT(argc >= 0);
@@ -807,11 +806,11 @@ static int parse_args(Args *a, int argc, char **argv, char ***pos_args) {
         }
 
         if (strcmp(argv[1], "bash") == 0) {
-            args__completion_bash_print(program_name);
+            args__bash_completion_script(program_name);
         } else if (strcmp(argv[1], "zsh") == 0) {
-            args__completion_zsh_print(program_name);
+            args__zsh_completion_script(program_name);
         } else if (strcmp(argv[1], "fish") == 0) {
-            args__completion_fish_print(program_name);
+            args__fish_completion_script(program_name);
         } else {
             ARGS__FATAL("Failed to generate completion script: unknown shell \"%s\"", argv[1]);
         }
@@ -824,13 +823,13 @@ static int parse_args(Args *a, int argc, char **argv, char ***pos_args) {
 
         if (strcmp(argv[1], "bash") == 0) {
             if (argc != 5) ARGS__FATAL("Command '__complete bash' requires arguments '<prev> <cur> <columns>'");
-            args__completion_bash_complete(a, argv[2], argv[3], argv[4]);
+            args__bash_complete(a, argv[2], argv[3], argv[4]);
         } else if (strcmp(argv[1], "zsh") == 0) {
             if (argc > 2) ARGS__FATAL("Command '__complete zsh' doesn't take arguments");
-            args__completion_zsh_complete(a);
+            args__zsh_complete(a);
         } else if (strcmp(argv[1], "fish") == 0) {
             if (argc > 2) ARGS__FATAL("Command '__complete fish' doesn't take arguments");
-            args__completion_fish_complete(a);
+            args__fish_complete(a);
         } else {
             ARGS__FATAL("Failed to generate completions: unknown shell \"%s\"", argv[1]);
         }
@@ -839,36 +838,36 @@ static int parse_args(Args *a, int argc, char **argv, char ***pos_args) {
     }
 #endif
 
-    int pos_args_idx = 0;
-    if (pos_args != NULL) {
-        a->pos_args = (char **) malloc(sizeof(*argv) * argc);
-        if (a->pos_args == NULL) ARGS__OUT_OF_MEMORY();
-        *pos_args = a->pos_args;
+    int positional_args_index = 0;
+    if (positional_args != NULL) {
+        a->positional_args = (char **) malloc(sizeof(*argv) * argc);
+        if (a->positional_args == NULL) ARGS__OUT_OF_MEMORY();
+        *positional_args = a->positional_args;
     }
 
     while (argc > 0) {
         char *arg = *argv;
-        size_t arg_len = strlen(arg);
+        size_t arg_length = strlen(arg);
         ARGS__MAYBE_UNUSED const char *full_arg = arg;
         argc--;
         argv++;
 
-        if (arg_len < 2 || arg[0] != '-') {
-            if (pos_args != NULL) (*pos_args)[pos_args_idx] = arg;
-            pos_args_idx++;
+        if (arg_length < 2 || arg[0] != '-') {
+            if (positional_args != NULL) (*positional_args)[positional_args_index] = arg;
+            positional_args_index++;
             continue;
         }
 
         if (arg[1] == '-') {
             arg += 2;
-            arg_len -= 2;
+            arg_length -= 2;
 
             Args__Option *option = a->head;
-            size_t option_len;
+            size_t option_length;
             while (option != NULL) {
-                option_len = strlen(option->long_name);
-                if (strncmp(arg, option->long_name, option_len) == 0
-                    && (arg[option_len] == '\0' || arg[option_len] == '=')) {
+                option_length = strlen(option->long_name);
+                if (strncmp(arg, option->long_name, option_length) == 0
+                    && (arg[option_length] == '\0' || arg[option_length] == '=')) {
                     break;
                 }
                 option = option->next;
@@ -885,14 +884,14 @@ static int parse_args(Args *a, int argc, char **argv, char ***pos_args) {
             option->is_set = true;
 
             if (option->type == ARGS__TYPE_BOOL) {
-                if (arg[option_len] == '=') ARGS__FATAL("Flags cannot have a value: \"%s\"", arg);
+                if (arg[option_length] == '=') ARGS__FATAL("Flags cannot have a value: \"%s\"", arg);
                 option->value.bool_ = true;
                 continue;
             }
 
             const char *value;
-            if (arg[option_len] == '=') {
-                value = arg + option_len + 1;
+            if (arg[option_length] == '=') {
+                value = arg + option_length + 1;
             } else {
                 if (argc == 0) ARGS__FATAL("Option \"%s\" is missing a value", option->long_name);
                 value = *argv;
@@ -903,11 +902,11 @@ static int parse_args(Args *a, int argc, char **argv, char ***pos_args) {
             args__parse_value(option, value);
         } else {
             arg++;
-            arg_len--;
-            while (arg_len > 0) {
+            arg_length--;
+            while (arg_length > 0) {
                 char ch = *arg;
                 arg++;
-                arg_len--;
+                arg_length--;
 
                 Args__Option *option = a->head;
                 while (option != NULL && option->short_name != ch) option = option->next;
@@ -929,9 +928,9 @@ static int parse_args(Args *a, int argc, char **argv, char ***pos_args) {
                 }
 
                 const char *value;
-                if (arg_len > 0) {
+                if (arg_length > 0) {
                     value = arg;
-                    arg_len = 0;
+                    arg_length = 0;
                 } else {
                     if (argc == 0) ARGS__FATAL("Option '%c' is missing a value", option->short_name);
                     value = *argv;
@@ -948,7 +947,7 @@ static int parse_args(Args *a, int argc, char **argv, char ***pos_args) {
         if (!option->is_optional && !option->is_set) ARGS__FATAL("Missing a required option \"%s\"", option->long_name);
     }
 
-    return pos_args_idx;
+    return positional_args_index;
 }
 
 // Prints all options to `fp`.
@@ -956,8 +955,8 @@ static int parse_args(Args *a, int argc, char **argv, char ***pos_args) {
 ARGS__MAYBE_UNUSED static void print_options(Args *a, FILE *fp) {
     ARGS__ASSERT(a != NULL && fp != NULL);
 
-    int offset = 4 + a->opt_max_name_length + ARGS_PADDING;
-    if (a->opt_have_short_name) offset += 4;
+    int offset = 4 + a->options_max_name_length + ARGS_PADDING;
+    if (a->options_have_short_name) offset += 4;
 
     fprintf(fp, "Options:\n");
     for (Args__Option *option = a->head; option != NULL; option = option->next) {
@@ -973,17 +972,17 @@ ARGS__MAYBE_UNUSED static void print_options(Args *a, FILE *fp) {
 
         if (option->short_name != '\0') {
             fprintf(fp, "-%c, ", option->short_name);
-        } else if (a->opt_have_short_name) {
+        } else if (a->options_have_short_name) {
             fprintf(fp, "    ");
         }
         fprintf(fp, "--%s", option->long_name);
 
         if (option->description != NULL || print_defaults) {
-            int length_diff = a->opt_max_name_length - strlen(option->long_name);
+            int length_diff = a->options_max_name_length - strlen(option->long_name);
             fprintf(fp, "%*c", length_diff + ARGS_PADDING, ' ');
         }
 
-        bool is_desc_multiline = false;
+        bool is_description_multiline = false;
         // Print description and break into multiple lines if needed.
         if (option->description != NULL) {
             int line_length = ARGS_LINE_LENGTH - offset;
@@ -994,7 +993,7 @@ ARGS__MAYBE_UNUSED static void print_options(Args *a, FILE *fp) {
             int length = strlen(option->description);
             while (length > 0) {
                 if (!is_first) {
-                    is_desc_multiline = true;
+                    is_description_multiline = true;
                     fprintf(fp, "\n%*c", offset, ' ');
                 }
                 is_first = false;
@@ -1023,7 +1022,7 @@ ARGS__MAYBE_UNUSED static void print_options(Args *a, FILE *fp) {
         }
 
         if (print_defaults) {
-            if (is_desc_multiline) {
+            if (is_description_multiline) {
                 // Print default on the new line to avoid breaking it too.
                 fprintf(fp, "\n%*c", offset, ' ');
             } else {
@@ -1031,13 +1030,13 @@ ARGS__MAYBE_UNUSED static void print_options(Args *a, FILE *fp) {
             }
             fprintf(fp, "(default: ");
             switch (option->type) {
-                case ARGS__TYPE_LONG:     fprintf(fp, "%ld", option->default_value.long_); break;
-                case ARGS__TYPE_FLOAT:    fprintf(fp, "%.3f", option->default_value.float_); break;
-                case ARGS__TYPE_BOOL:     ARGS__UNREACHABLE();
-                case ARGS__TYPE_STR:
-                case ARGS__TYPE_PATH:     args__print_str_default(fp, option->default_value.str); break;
-                case ARGS__TYPE_ENUM_STR:
-                case ARGS__TYPE_ENUM_IDX: args__print_str_default(fp, option->default_value.enum_); break;
+                case ARGS__TYPE_LONG:        fprintf(fp, "%ld", option->default_value.long_); break;
+                case ARGS__TYPE_FLOAT:       fprintf(fp, "%.3f", option->default_value.float_); break;
+                case ARGS__TYPE_BOOL:        ARGS__UNREACHABLE();
+                case ARGS__TYPE_STRING:
+                case ARGS__TYPE_PATH:        args__print_string_value(fp, option->default_value.string); break;
+                case ARGS__TYPE_ENUM_STRING:
+                case ARGS__TYPE_ENUM_INDEX:  args__print_string_value(fp, option->default_value.enum_); break;
             }
             fprintf(fp, ")");
         }
@@ -1129,7 +1128,9 @@ public:
     }
 
     // See `::parse_args()`
-    int parse_args(int argc, char **argv, char **&pos_args) { return ::parse_args(&args, argc, argv, &pos_args); }
+    int parse_args(int argc, char **argv, char **&positional_args) {
+        return ::parse_args(&args, argc, argv, &positional_args);
+    }
 
     // See `::print_options()`
     ARGS__MAYBE_UNUSED void print_options(FILE *fp = stdout) { ::print_options(&args, fp); }
