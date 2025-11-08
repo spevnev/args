@@ -664,7 +664,7 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const float *option_float(
 // Result can be NULL only if default value is NULL.
 // Use '\0' for no short name.
 // Exits if `a` or `long_name` is NULL, or out of memory.
-ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const char **option_str(
+ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const char **option_string(
     Args *a,
     char short_name,
     const char *long_name,
@@ -684,7 +684,7 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const char **option_str(
     return (const char **) &option->value.string;
 }
 
-// Same as `option_str` except that shell completion will suggest paths.
+// Same as `option_string` except that shell completion will suggest paths.
 // Does NOT check that the value is a path.
 ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const char **option_path(
     Args *a,
@@ -753,7 +753,7 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const size_t *option_enum(
 // `values` must be a NULL-terminated array, matched case-insensitively.
 // Use '\0' for no short name.
 // Exits if `a`, `long_name`, or `values` is NULL, or out of memory.
-ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const char **option_enum_str(
+ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const char **option_enum_string(
     Args *a,
     char short_name,
     const char *long_name,
@@ -1076,15 +1076,15 @@ public:
         return *::option_float(&args, short_name, long_name, description, is_optional, default_value);
     }
 
-    // See `::option_str()`
-    ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT const char *&option_str(
+    // See `::option_string()`
+    ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT const char *&option_string(
         char short_name,
         const char *long_name,
         const char *description,
         bool is_optional = true,
         const char *default_value = nullptr
     ) {
-        return *::option_str(&args, short_name, long_name, description, is_optional, default_value);
+        return *::option_string(&args, short_name, long_name, description, is_optional, default_value);
     }
 
     // See `::option_path()`
@@ -1119,8 +1119,8 @@ public:
         return *::option_enum(&args, short_name, long_name, description, is_optional, default_value, values);
     }
 
-    // See `::option_enum_str()`
-    ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT const char *&option_enum_str(
+    // See `::option_enum_string()`
+    ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT const char *&option_enum_string(
         char short_name,
         const char *long_name,
         const char *description,
@@ -1128,7 +1128,7 @@ public:
         const char *default_value,
         const char **values
     ) {
-        return *::option_enum_str(&args, short_name, long_name, description, is_optional, default_value, values);
+        return *::option_enum_string(&args, short_name, long_name, description, is_optional, default_value, values);
     }
 
     // See `::parse_args()`

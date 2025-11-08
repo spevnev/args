@@ -9,7 +9,7 @@ int main(int argc, char **argv) {
     const bool *version = option_flag(&a, 'v', "version", "Print version");
     const long *l = option_long(&a, 'l', "long", "A long option", true, 0);
     const float *f = option_float(&a, 'f', "float", "A float option", true, 0.0F);
-    const char **s = option_str(&a, 's', "str", "A string option", true, NULL);
+    const char **s = option_string(&a, 's', "str", "A string option", true, NULL);
     const char **p = option_path(&a, 'p', "path", "A path option", true, NULL);
 
     // If enum is continuous and array matches it, result of `option_enum` can be converted directly.
@@ -17,7 +17,7 @@ int main(int argc, char **argv) {
     const char *enum_values[] = {"first", "second", "third", NULL};
     Enum *e = (Enum *) option_enum(&a, 'e', "enum", "An enum option", true, FIRST, enum_values);
     // If values don't match, or the enum isn't continuous, it may be desirable to get a string instead.
-    const char **es = option_enum_str(&a, '\0', "enum-str", "A string enum option", true, "default", enum_values);
+    const char **es = option_enum_string(&a, '\0', "enum-str", "A string enum option", true, "default", enum_values);
 
     // Parse arguments. Sets option values and returns positional arguments.
     // Handles shell completion by printing to stdout and exiting.

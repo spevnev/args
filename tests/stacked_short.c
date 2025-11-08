@@ -10,7 +10,7 @@ int main(int argc, char **argv) {
     const bool *e = option_flag(&a, 'e', "opte", NULL);
     const long *l = option_long(&a, 'l', "optl", NULL, false, 0);
     const long *L = option_long(&a, 'L', "optL", NULL, false, 0);
-    const char **s = option_str(&a, 's', "opts", NULL, false, NULL);
+    const char **s = option_string(&a, 's', "opts", NULL, false, NULL);
 
     int pos_args_len = parse_args(&a, argc, argv, NULL);
     assert(pos_args_len == 0);

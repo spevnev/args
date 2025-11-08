@@ -8,12 +8,12 @@ int main(int argc, char **argv) {
     const auto &version = args.option_flag('v', "version", "Print version");
     const auto &l = args.option_long('l', "long", "A long option", true, 0);
     const auto &f = args.option_float('f', "float", "A float option", true, 0.0F);
-    const auto &s = args.option_str('s', "str", "A string option", true, nullptr);
+    const auto &s = args.option_string('s', "str", "A string option", true, nullptr);
     const auto &p = args.option_path('p', "path", "A path option", true, nullptr);
 
     const char *enum_values[] = {"first", "sed", "third", nullptr};
     const auto &e = args.option_enum('e', "enum", "An enum option", true, 0, enum_values);
-    const auto &es = args.option_enum_str('\0', "enum-str", "A string enum option", true, "default", enum_values);
+    const auto &es = args.option_enum_string('\0', "enum-str", "A string enum option", true, "default", enum_values);
 
     // Parse arguments. Sets option values and returns positional arguments.
     // Handles shell completion by printing to stdout and exiting.
