@@ -48,8 +48,8 @@
 #define ARGS_LINE_LENGTH 80
 #endif
 
-#ifndef ARGS_MIN_DESC_LENGTH
-#define ARGS_MIN_DESC_LENGTH 30
+#ifndef ARGS_MIN_DESCRIPTION_LENGTH
+#define ARGS_MIN_DESCRIPTION_LENGTH 30
 #endif
 
 typedef enum {
@@ -990,7 +990,7 @@ ARGS__MAYBE_UNUSED static void print_options(Args *a, FILE *fp) {
         // Print description and break into multiple lines if needed.
         if (option->description != NULL) {
             int line_length = ARGS_LINE_LENGTH - offset;
-            if (line_length < ARGS_MIN_DESC_LENGTH) line_length = ARGS_MIN_DESC_LENGTH;
+            if (line_length < ARGS_MIN_DESCRIPTION_LENGTH) line_length = ARGS_MIN_DESCRIPTION_LENGTH;
 
             bool is_first = true;
             char *cur = option->description;

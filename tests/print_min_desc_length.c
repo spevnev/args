@@ -1,5 +1,5 @@
 #define ARGS_LINE_LENGTH 20
-#define ARGS_MIN_DESC_LENGTH 60
+#define ARGS_MIN_DESCRIPTION_LENGTH 60
 #include "print.c"
 
 //< -f 1

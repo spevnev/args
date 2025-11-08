@@ -157,15 +157,15 @@ PROGRAM_NAME completion fish > /usr/share/fish/vendor_completions.d/PROGRAM_NAME
 
 ## Library options
 
-| option                    | description                                                      | default     |
-|---------------------------|------------------------------------------------------------------|-------------|
-| `ARGS_DISABLE_COMPLETION` | Disable shell completion                                         | not defined |
-| `ARGS_SKIP_UNKNOWN`       | Skip unknown options, otherwise it is an error                   | not defined |
-| `ARGS_ALLOW_OVERWRITING`  | Allow overwriting option, otherwise it is an error               | not defined |
-| `ARGS_PADDING`            | The number of spaces between the option name and its description | 2           |
-| `ARGS_LINE_LENGTH`        | Line length                                                      | 80          |
-| `ARGS_MIN_DESC_LENGTH`    | Minimum length of the description line, ignoring the line length | 30          |
-| `ARGS_HIDE_DEFAULTS`      | Hides default values when printing options                       | not defined |
+| option                        | description                                                      | default     |
+|-------------------------------|------------------------------------------------------------------|-------------|
+| `ARGS_DISABLE_COMPLETION`     | Disable shell completion                                         | not defined |
+| `ARGS_SKIP_UNKNOWN`           | Skip unknown options, otherwise it is an error                   | not defined |
+| `ARGS_ALLOW_OVERWRITING`      | Allow overwriting option, otherwise it is an error               | not defined |
+| `ARGS_PADDING`                | The number of spaces between the option name and its description | 2           |
+| `ARGS_LINE_LENGTH`            | Line length                                                      | 80          |
+| `ARGS_MIN_DESCRIPTION_LENGTH` | Minimum length of the description line, ignoring the line length | 30          |
+| `ARGS_HIDE_DEFAULTS`          | Hides default values when printing options                       | not defined |
 
 ## Contributing
 

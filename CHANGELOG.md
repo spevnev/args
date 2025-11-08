@@ -5,6 +5,7 @@
 ### Changed
 
 - **BREAKING**: Make options return constant pointers
+- **BREAKING**: Rename `ARGS_MIN_DESC_LENGTH` to `ARGS_MIN_DESCRIPTION_LENGTH`
 
 ## [1.3.0](https://github.com/spevnev/args/releases/tag/v1.3.0)
 
