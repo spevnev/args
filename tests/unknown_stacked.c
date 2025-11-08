@@ -10,9 +10,9 @@ int main(int argc, char **argv) {
     atexit(success);
 
     Args a = {0};
-    (void) !option_flag(&a, 'b', "optb", NULL);
-    (void) !option_flag(&a, 'c', "optc", NULL);
-    (void) !option_flag(&a, 'd', "optd", NULL);
+    (void) !option_flag(&a, "optb", NULL, .short_name = 'b');
+    (void) !option_flag(&a, "optc", NULL, .short_name = 'c');
+    (void) !option_flag(&a, "optd", NULL, .short_name = 'd');
 
     parse_args(&a, argc, argv, NULL);
 

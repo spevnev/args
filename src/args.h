@@ -67,7 +67,7 @@ typedef struct Args__Option {
     char short_name;
     char *long_name;
     char *description;
-    bool is_optional;
+    bool is_required;
     bool is_set;
     bool is_matching;
     Args__Type type;
@@ -160,12 +160,37 @@ static const char *args__basename(const char *path) {
     return filename == NULL ? path : filename + 1;
 }
 
+static void args__set_enum_values(Args__Option *option, const char **values) {
+    ARGS__ASSERT(option != NULL && values != NULL);
+
+    size_t length = 0;
+    while (values[length] != NULL) length++;
+    option->value.enum_.length = length;
+
+    char **copy = (char **) malloc(sizeof(*copy) * length);
+    if (copy == NULL) ARGS__OUT_OF_MEMORY();
+    option->value.enum_.values = copy;
+
+    for (size_t i = 0; i < length; i++) {
+        for (const char *c = values[i]; *c != '\0'; c++) {
+            if (!isprint(*c)) {
+                ARGS__FATAL(
+                    "Enum value of \"%s\" contains an invalid character 0x%x. "
+                    "Maybe enum array is missing a NULL-terminator",
+                    option->long_name, *c
+                );
+            }
+        }
+        copy[i] = args__strdup(values[i]);
+    }
+}
+
 static Args__Option *args__new_option(
     Args *a,
-    char short_name,
     const char *long_name,
     const char *description,
-    bool is_optional,
+    char short_name,
+    bool is_required,
     Args__Type type
 ) {
     ARGS__ASSERT(a != NULL);
@@ -200,7 +225,7 @@ static Args__Option *args__new_option(
     option->short_name = short_name;
     option->long_name = args__strdup(long_name);
     option->description = description == NULL ? NULL : args__strdup(description);
-    option->is_optional = is_optional;
+    option->is_required = is_required;
     option->is_set = false;
     option->is_matching = false;
     option->type = type;
@@ -218,29 +243,132 @@ static Args__Option *args__new_option(
     return option;
 }
 
-static void args__set_enum_values(Args__Option *option, const char **values) {
-    ARGS__ASSERT(option != NULL && values != NULL);
+#define ARGS__GET_FIRST_(N, ...) N
+#define ARGS__GET_FIRST(...) ARGS__GET_FIRST_(__VA_ARGS__, 0)
+#define ARGS__GET_SECOND(N, M, ...) M
+#define ARGS__DROP_TWO(N, M, ...) __VA_ARGS__
 
-    size_t length = 0;
-    while (values[length] != NULL) length++;
-    option->value.enum_.length = length;
+// Takes struct type and variadic arguments consisting of a sentinel, followed by zero or more designations.
+// Returns a compound literal of the provided type followed by a trailing comma.
+// If there are designations, uses designated initializer, otherwise struct is zero-initialized.
+// clang-format off
+#define ARGS__ZERO_OR_DESIGNATED(struct_type_t, ...) \
+        (struct_type_t) {                            \
+            ARGS__GET_SECOND(__VA_ARGS__, 0 }, ),          \
+            ARGS__DROP_TWO(__VA_ARGS__, }, )
+// clang-format on
 
-    char **copy = (char **) malloc(sizeof(*copy) * length);
-    if (copy == NULL) ARGS__OUT_OF_MEMORY();
-    option->value.enum_.values = copy;
-
-    for (size_t i = 0; i < length; i++) {
-        for (const char *c = values[i]; *c != '\0'; c++) {
-            if (!isprint(*c)) {
-                ARGS__FATAL(
-                    "Enum value of \"%s\" contains an invalid character 0x%x. "
-                    "Maybe enum array is missing a NULL-terminator",
-                    option->long_name, *c
-                );
-            }
-        }
-        copy[i] = args__strdup(values[i]);
+#define ARGS__OPTION_ARGS_STRUCT(default_value_t) \
+    struct {                                      \
+        char short_name;                          \
+        bool required;                            \
+        default_value_t default_value;            \
     }
+
+typedef ARGS__OPTION_ARGS_STRUCT(long) Args__OptionLongArgs;
+
+ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const long *args__option_long(
+    Args__OptionLongArgs args,
+    Args *a,
+    const char *long_name,
+    const char *description
+) {
+    ARGS__ASSERT(a != NULL);
+    Args__Option *option = args__new_option(a, long_name, description, args.short_name, args.required, ARGS__TYPE_LONG);
+    option->default_value.long_ = option->value.long_ = args.default_value;
+    return &option->value.long_;
+}
+
+typedef ARGS__OPTION_ARGS_STRUCT(float) Args__OptionFloatArgs;
+
+ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const float *args__option_float(
+    Args__OptionFloatArgs args,
+    Args *a,
+    const char *long_name,
+    const char *description
+) {
+    ARGS__ASSERT(a != NULL);
+    Args__Option *option
+        = args__new_option(a, long_name, description, args.short_name, args.required, ARGS__TYPE_FLOAT);
+    option->default_value.float_ = option->value.float_ = args.default_value;
+    return &option->value.float_;
+}
+
+typedef ARGS__OPTION_ARGS_STRUCT(const char *) Args__OptionStringArgs;
+
+ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const char **args__option_string(
+    Args__OptionStringArgs args,
+    Args__Type type,
+    Args *a,
+    const char *long_name,
+    const char *description
+) {
+    ARGS__ASSERT((type == ARGS__TYPE_STRING || type == ARGS__TYPE_PATH) && a != NULL);
+    Args__Option *option = args__new_option(a, long_name, description, args.short_name, args.required, type);
+    if (args.default_value == NULL) {
+        option->default_value.string = NULL;
+        option->value.string = NULL;
+    } else {
+        option->default_value.string = args__strdup(args.default_value);
+        option->value.string = args__strdup(args.default_value);
+    }
+    return (const char **) &option->value.string;
+}
+
+typedef struct {
+    char short_name;
+} Args__OptionFlagArgs;
+
+ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const bool *args__option_flag(
+    Args__OptionFlagArgs args,
+    Args *a,
+    const char *long_name,
+    const char *description
+) {
+    ARGS__ASSERT(a != NULL);
+    Args__Option *option = args__new_option(a, long_name, description, args.short_name, false, ARGS__TYPE_BOOL);
+    option->value.bool_ = false;
+    return &option->value.bool_;
+}
+
+typedef ARGS__OPTION_ARGS_STRUCT(size_t) Args__OptionEnumArgs;
+
+ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const size_t *args__option_enum(
+    Args__OptionEnumArgs args,
+    Args *a,
+    const char *long_name,
+    const char *description,
+    const char **values
+) {
+    ARGS__ASSERT(a != NULL && values != NULL);
+    Args__Option *option
+        = args__new_option(a, long_name, description, args.short_name, args.required, ARGS__TYPE_ENUM_INDEX);
+    args__set_enum_values(option, values);
+    option->value.enum_.as.index = args.default_value;
+    if (args.default_value < option->value.enum_.length) {
+        option->default_value.enum_ = args__strdup(values[args.default_value]);
+    } else {
+        option->default_value.enum_ = NULL;
+    }
+    return &option->value.enum_.as.index;
+}
+
+typedef ARGS__OPTION_ARGS_STRUCT(const char *) Args__OptionEnumStringArgs;
+
+ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const char **args__option_enum_string(
+    Args__OptionEnumStringArgs args,
+    Args *a,
+    const char *long_name,
+    const char *description,
+    const char **values
+) {
+    ARGS__ASSERT(a != NULL && values != NULL);
+    Args__Option *option
+        = args__new_option(a, long_name, description, args.short_name, args.required, ARGS__TYPE_ENUM_STRING);
+    option->default_value.enum_ = args.default_value == NULL ? NULL : args__strdup(args.default_value);
+    args__set_enum_values(option, values);
+    option->value.enum_.as.value = option->default_value.enum_;
+    return &option->value.enum_.as.value;
 }
 
 static void args__parse_value(Args__Option *option, const char *value) {
@@ -625,151 +753,6 @@ static void free_args(Args *a) {
     a->positional_args = NULL;
 }
 
-// Defines a long option, returns a pointer set by `parse_args`.
-// Use '\0' for no short name.
-// Exits if `a` or `long_name` is NULL, or out of memory.
-ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const long *option_long(
-    Args *a,
-    char short_name,
-    const char *long_name,
-    const char *description,
-    bool is_optional,
-    long default_value
-) {
-    ARGS__ASSERT(a != NULL);
-    Args__Option *option = args__new_option(a, short_name, long_name, description, is_optional, ARGS__TYPE_LONG);
-    option->default_value.long_ = option->value.long_ = default_value;
-    return &option->value.long_;
-}
-
-// Defines a float option, returns a pointer set by `parse_args`.
-// Use '\0' for no short name.
-// Exits if `a` or `long_name` is NULL, or out of memory.
-ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const float *option_float(
-    Args *a,
-    char short_name,
-    const char *long_name,
-    const char *description,
-    bool is_optional,
-    float default_value
-) {
-    ARGS__ASSERT(a != NULL);
-    Args__Option *option = args__new_option(a, short_name, long_name, description, is_optional, ARGS__TYPE_FLOAT);
-    option->default_value.float_ = option->value.float_ = default_value;
-    return &option->value.float_;
-}
-
-// Defines a string option, returns a pointer set by `parse_args`.
-// String memory is owned by library, freed by `free_args`.
-// Result can be NULL only if default value is NULL.
-// Use '\0' for no short name.
-// Exits if `a` or `long_name` is NULL, or out of memory.
-ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const char **option_string(
-    Args *a,
-    char short_name,
-    const char *long_name,
-    const char *description,
-    bool is_optional,
-    const char *default_value
-) {
-    ARGS__ASSERT(a != NULL);
-    Args__Option *option = args__new_option(a, short_name, long_name, description, is_optional, ARGS__TYPE_STRING);
-    if (default_value == NULL) {
-        option->default_value.string = NULL;
-        option->value.string = NULL;
-    } else {
-        option->default_value.string = args__strdup(default_value);
-        option->value.string = args__strdup(default_value);
-    }
-    return (const char **) &option->value.string;
-}
-
-// Same as `option_string` except that shell completion will suggest paths.
-// Does NOT check that the value is a path.
-ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const char **option_path(
-    Args *a,
-    char short_name,
-    const char *long_name,
-    const char *description,
-    bool is_optional,
-    const char *default_value
-) {
-    ARGS__ASSERT(a != NULL);
-    Args__Option *option = args__new_option(a, short_name, long_name, description, is_optional, ARGS__TYPE_PATH);
-    if (default_value == NULL) {
-        option->default_value.string = NULL;
-        option->value.string = NULL;
-    } else {
-        option->default_value.string = args__strdup(default_value);
-        option->value.string = args__strdup(default_value);
-    }
-    return (const char **) &option->value.string;
-}
-
-// Defines a boolean flag, returns a pointer set by `parse_args`.
-// Use '\0' for no short name.
-// Exits if `a` or `long_name` is NULL, or out of memory.
-ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const bool *option_flag(
-    Args *a,
-    char short_name,
-    const char *long_name,
-    const char *description
-) {
-    ARGS__ASSERT(a != NULL);
-    Args__Option *option = args__new_option(a, short_name, long_name, description, true, ARGS__TYPE_BOOL);
-    option->value.bool_ = false;
-    return &option->value.bool_;
-}
-
-// Defines an enum option, returns a pointer set by `parse_args`.
-// Result is either a valid index or a default value.
-// `values` must be a NULL-terminated array, matched case-insensitively.
-// Use '\0' for no short name.
-// Exits if `a`, `long_name`, or `values` is NULL, or out of memory.
-ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const size_t *option_enum(
-    Args *a,
-    char short_name,
-    const char *long_name,
-    const char *description,
-    const char **values,
-    bool is_optional,
-    size_t default_value
-) {
-    ARGS__ASSERT(a != NULL && values != NULL);
-    Args__Option *option = args__new_option(a, short_name, long_name, description, is_optional, ARGS__TYPE_ENUM_INDEX);
-    args__set_enum_values(option, values);
-    option->value.enum_.as.index = default_value;
-    if (default_value < option->value.enum_.length) {
-        option->default_value.enum_ = args__strdup(values[default_value]);
-    } else {
-        option->default_value.enum_ = NULL;
-    }
-    return &option->value.enum_.as.index;
-}
-
-// Defines an enum option, returns a pointer set by `parse_args`.
-// Result is either a string from `values` or a default value.
-// String and array memory is owned by library, freed by `free_args`.
-// `values` must be a NULL-terminated array, matched case-insensitively.
-// Use '\0' for no short name.
-// Exits if `a`, `long_name`, or `values` is NULL, or out of memory.
-ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const char **option_enum_string(
-    Args *a,
-    char short_name,
-    const char *long_name,
-    const char *description,
-    const char **values,
-    bool is_optional,
-    const char *default_value
-) {
-    ARGS__ASSERT(a != NULL && values != NULL);
-    Args__Option *option = args__new_option(a, short_name, long_name, description, is_optional, ARGS__TYPE_ENUM_STRING);
-    option->default_value.enum_ = default_value == NULL ? NULL : args__strdup(default_value);
-    args__set_enum_values(option, values);
-    option->value.enum_.as.value = option->default_value.enum_;
-    return &option->value.enum_.as.value;
-}
-
 // Parses arguments, sets option-returned values.
 // Unless disabled, handles shell completion by writing to stdout and exiting.
 // Must be called before side effects or stdout output.
@@ -948,7 +931,7 @@ static int parse_args(Args *a, int argc, char **argv, char ***positional_args) {
     }
 
     for (Args__Option *option = a->head; option != NULL; option = option->next) {
-        if (!option->is_optional && !option->is_set) ARGS__FATAL("Missing a required option \"%s\"", option->long_name);
+        if (option->is_required && !option->is_set) ARGS__FATAL("Missing a required option \"%s\"", option->long_name);
     }
 
     return positional_args_index;
@@ -967,7 +950,7 @@ ARGS__MAYBE_UNUSED static void print_options(Args *a, FILE *fp) {
 #ifdef ARGS_HIDE_DEFAULTS
         bool print_defaults = false;
 #else
-        bool print_defaults = option->is_optional;
+        bool print_defaults = !option->is_required;
         // Flag's default is always false, don't print their value.
         if (option->type == ARGS__TYPE_BOOL) print_defaults = false;
 #endif
@@ -1048,87 +1031,199 @@ ARGS__MAYBE_UNUSED static void print_options(Args *a, FILE *fp) {
     }
 }
 
-#ifdef __cplusplus
+#ifndef __cplusplus
+
+// Defines a long option, returns a pointer set by `parse_args`.
+// Exits if `a` or `long_name` is NULL, or out of memory.
+#define option_long(a, long_name, ...)                                                                         \
+    args__option_long(                                                                                         \
+        ARGS__ZERO_OR_DESIGNATED(Args__OptionLongArgs, __VA_ARGS__) a, long_name, ARGS__GET_FIRST(__VA_ARGS__) \
+    )
+
+// Defines a float option, returns a pointer set by `parse_args`.
+// Exits if `a` or `long_name` is NULL, or out of memory.
+#define option_float(a, long_name, ...)                                                                         \
+    args__option_float(                                                                                         \
+        ARGS__ZERO_OR_DESIGNATED(Args__OptionFloatArgs, __VA_ARGS__) a, long_name, ARGS__GET_FIRST(__VA_ARGS__) \
+    )
+
+// Defines a string option, returns a pointer set by `parse_args`.
+// String memory is owned by library, freed by `free_args`.
+// Result can be NULL only if default value is NULL.
+// Exits if `a` or `long_name` is NULL, or out of memory.
+#define option_string(a, long_name, ...)                                                               \
+    args__option_string(                                                                               \
+        ARGS__ZERO_OR_DESIGNATED(Args__OptionStringArgs, __VA_ARGS__) ARGS__TYPE_STRING, a, long_name, \
+        ARGS__GET_FIRST(__VA_ARGS__)                                                                   \
+    )
+
+// Same as `option_string` except that shell completion will suggest paths.
+// Does NOT check that the value is a path.
+#define option_path(a, long_name, ...)                                                               \
+    args__option_string(                                                                             \
+        ARGS__ZERO_OR_DESIGNATED(Args__OptionStringArgs, __VA_ARGS__) ARGS__TYPE_PATH, a, long_name, \
+        ARGS__GET_FIRST(__VA_ARGS__)                                                                 \
+    )
+
+// Defines a boolean flag, returns a pointer set by `parse_args`.
+// It is always not required, and defaults to false.
+// Exits if `a` or `long_name` is NULL, or out of memory.
+#define option_flag(a, long_name, ...)                                                                         \
+    args__option_flag(                                                                                         \
+        ARGS__ZERO_OR_DESIGNATED(Args__OptionFlagArgs, __VA_ARGS__) a, long_name, ARGS__GET_FIRST(__VA_ARGS__) \
+    )
+
+// Defines an enum option, returns a pointer set by `parse_args`.
+// Result is either a valid index or a default value.
+// `values` must be a NULL-terminated array, matched case-insensitively.
+// When `values` array is defined in arguments, it must be wrapped in parenthesis.
+// Exits if `a`, `long_name`, or `values` is NULL, or out of memory.
+#define option_enum(a, long_name, description, ...)                                            \
+    args__option_enum(                                                                         \
+        ARGS__ZERO_OR_DESIGNATED(Args__OptionEnumArgs, __VA_ARGS__) a, long_name, description, \
+        ARGS__GET_FIRST(__VA_ARGS__)                                                           \
+    )
+
+// Defines an enum option, returns a pointer set by `parse_args`.
+// Result is either a string from `values` or a default value.
+// String and array memory is owned by library, freed by `free_args`.
+// `values` must be a NULL-terminated array, matched case-insensitively.
+// When `values` array is defined in arguments, it must be wrapped in parenthesis.
+// Exits if `a`, `long_name`, or `values` is NULL, or out of memory.
+#define option_enum_string(a, long_name, description, ...)                                           \
+    args__option_enum_string(                                                                        \
+        ARGS__ZERO_OR_DESIGNATED(Args__OptionEnumStringArgs, __VA_ARGS__) a, long_name, description, \
+        ARGS__GET_FIRST(__VA_ARGS__)                                                                 \
+    )
+
+#else  // __cplusplus
+
 class ArgsCpp {
 public:
     ArgsCpp() : args() {}
     ~ArgsCpp() { free_args(&args); }
 
-    // See `::option_long()`
+    // Defines a long option, returned value is set by `parse_args`.
+    // Use '\0' for no short name.
+    // Exits if  `long_name` is nullptr, or out of memory.
     ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT const long &option_long(
         char short_name,
         const char *long_name,
         const char *description,
-        bool is_optional = true,
+        bool is_required = false,
         long default_value = 0
     ) {
-        return *::option_long(&args, short_name, long_name, description, is_optional, default_value);
+        Args__OptionLongArgs option_args{};
+        option_args.short_name = short_name;
+        option_args.required = is_required;
+        option_args.default_value = default_value;
+        return *args__option_long(option_args, &args, long_name, description);
     }
 
-    // See `::option_float()`
+    // Defines a float option, returned value is set by `parse_args`.
+    // Use '\0' for no short name.
+    // Exits if  `long_name` is nullptr, or out of memory.
     ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT const float &option_float(
         char short_name,
         const char *long_name,
         const char *description,
-        bool is_optional = true,
+        bool is_required = false,
         float default_value = 0.0F
     ) {
-        return *::option_float(&args, short_name, long_name, description, is_optional, default_value);
+        Args__OptionFloatArgs option_args{};
+        option_args.short_name = short_name;
+        option_args.required = is_required;
+        option_args.default_value = default_value;
+        return *args__option_float(option_args, &args, long_name, description);
     }
 
-    // See `::option_string()`
+    // Defines a string option, returned value is set by `parse_args`.
+    // String memory is owned by library, freed in destructor.
+    // Result can be nullptr only if default value is nullptr.
+    // Use '\0' for no short name.
+    // Exits if `long_name` is nullptr, or out of memory.
     ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT const char *&option_string(
         char short_name,
         const char *long_name,
         const char *description,
-        bool is_optional = true,
+        bool is_required = false,
         const char *default_value = nullptr
     ) {
-        return *::option_string(&args, short_name, long_name, description, is_optional, default_value);
+        Args__OptionStringArgs option_args{};
+        option_args.short_name = short_name;
+        option_args.required = is_required;
+        option_args.default_value = default_value;
+        return *args__option_string(option_args, ARGS__TYPE_STRING, &args, long_name, description);
     }
 
-    // See `::option_path()`
+    // Same as `option_string` except that shell completion will suggest paths.
+    // Does NOT check that the value is a path.
     ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT const char *&option_path(
         char short_name,
         const char *long_name,
         const char *description,
-        bool is_optional = true,
+        bool is_required = false,
         const char *default_value = nullptr
     ) {
-        return *::option_path(&args, short_name, long_name, description, is_optional, default_value);
+        Args__OptionStringArgs option_args{};
+        option_args.short_name = short_name;
+        option_args.required = is_required;
+        option_args.default_value = default_value;
+        return *args__option_string(option_args, ARGS__TYPE_PATH, &args, long_name, description);
     }
 
-    // See `::option_flag()`
+    // Defines a boolean flag, returned value is set by `parse_args`.
+    // Use '\0' for no short name.
+    // Exits if `long_name` is nullptr, or out of memory.
     ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT const bool &option_flag(
         char short_name,
         const char *long_name,
         const char *description
     ) {
-        return *::option_flag(&args, short_name, long_name, description);
+        Args__OptionFlagArgs option_args{};
+        option_args.short_name = short_name;
+        return *args__option_flag(option_args, &args, long_name, description);
     }
 
-    // See `::option_enum()`
+    // Defines an enum option, returned value is set by `parse_args`.
+    // Result is either a valid index or a default value.
+    // `values` must be a nullptr-terminated array, matched case-insensitively.
+    // Use '\0' for no short name.
+    // Exits if `long_name` or `values` is nullptr, or out of memory.
     ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT const size_t &option_enum(
         char short_name,
         const char *long_name,
         const char *description,
         const char **values,
-        bool is_optional = true,
+        bool is_required = false,
         size_t default_value = 0
     ) {
-        return *::option_enum(&args, short_name, long_name, description, values, is_optional, default_value);
+        Args__OptionEnumArgs option_args{};
+        option_args.short_name = short_name;
+        option_args.required = is_required;
+        option_args.default_value = default_value;
+        return *args__option_enum(option_args, &args, long_name, description, values);
     }
 
-    // See `::option_enum_string()`
+    // Defines an enum option, returned value is set by `parse_args`.
+    // Result is either a string from `values` or a default value.
+    // String and array memory is owned by library, freed in destructor.
+    // `values` must be a nullptr-terminated array, matched case-insensitively.
+    // Use '\0' for no short name.
+    // Exits if `long_name` or `values` is nullptr, or out of memory.
     ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT const char *&option_enum_string(
         char short_name,
         const char *long_name,
         const char *description,
         const char **values,
-        bool is_optional = true,
+        bool is_required = false,
         const char *default_value = nullptr
     ) {
-        return *::option_enum_string(&args, short_name, long_name, description, values, is_optional, default_value);
+        Args__OptionEnumStringArgs option_args{};
+        option_args.short_name = short_name;
+        option_args.required = is_required;
+        option_args.default_value = default_value;
+        return *args__option_enum_string(option_args, &args, long_name, description, values);
     }
 
     // See `::parse_args()`
@@ -1142,6 +1237,7 @@ public:
 private:
     Args args;
 };
+
 #endif  // __cplusplus
 
 #undef ARGS__HAS_ATTRIBUTE
@@ -1151,3 +1247,4 @@ private:
 #undef ARGS__OUT_OF_MEMORY
 #undef ARGS__UNREACHABLE
 #undef ARGS__ASSERT
+#undef ARGS__OPTION_ARGS_STRUCT

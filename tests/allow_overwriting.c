@@ -5,7 +5,7 @@
 //< --opt 1 -o 2 --opt 3
 int main(int argc, char **argv) {
     Args a = {0};
-    const long *opt = option_long(&a, 'o', "opt", NULL, false, 0);
+    const long *opt = option_long(&a, "opt", NULL, .short_name = 'o', .required = true);
 
     int pos_args_len = parse_args(&a, argc, argv, NULL);
     assert(pos_args_len == 0);

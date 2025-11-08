@@ -2,12 +2,13 @@
 
 ## Unreleased
 
-### Changed
+### **BREAKING** Changes
 
-- **BREAKING**: Make options return constant pointers
-- **BREAKING**: Rename `ARGS_MIN_DESC_LENGTH` to `ARGS_MIN_DESCRIPTION_LENGTH`
-- **BREAKING**: Rename `option_str` and `option_enum_str` to `option_string` and `option_enum_string`
-- **BREAKING**: Reorder `option_enum` arguments
+- Completely change option functions: turn `short_name`, `is_optional`, and `default_value` into optional arguments
+- Make options return constant pointers
+- Rename `ARGS_MIN_DESC_LENGTH` to `ARGS_MIN_DESCRIPTION_LENGTH`
+- Rename `option_str` and `option_enum_str` to `option_string` and `option_enum_string`
+- Reorder `option_enum` arguments
 
 ## [1.3.0](https://github.com/spevnev/args/releases/tag/v1.3.0)
 

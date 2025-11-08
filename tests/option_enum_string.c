@@ -6,10 +6,10 @@ int main(int argc, char **argv) {
     const char *ENUM_VALUES[] = {"first", "second", "third", NULL};
 
     Args a = {0};
-    const char **l1 = option_enum_string(&a, '\0', "long1", NULL, ENUM_VALUES, false, NULL);
-    const char **l2 = option_enum_string(&a, '\0', "long2", NULL, ENUM_VALUES, false, NULL);
-    const char **s = option_enum_string(&a, 's', "long3", NULL, ENUM_VALUES, false, NULL);
-    const char **d = option_enum_string(&a, '\0', "long4", NULL, ENUM_VALUES, true, "DEFAULT");
+    const char **l1 = option_enum_string(&a, "long1", NULL, ENUM_VALUES, .required = true);
+    const char **l2 = option_enum_string(&a, "long2", NULL, ENUM_VALUES, .required = true);
+    const char **s = option_enum_string(&a, "long3", NULL, ENUM_VALUES, .short_name = 's', .required = true);
+    const char **d = option_enum_string(&a, "long4", NULL, ENUM_VALUES, .default_value = "DEFAULT");
 
     int pos_args_len = parse_args(&a, argc, argv, NULL);
     assert(pos_args_len == 0);

@@ -16,19 +16,29 @@ int main(int argc, char **argv) {
     Args a = {0};
 
     // Define options.
-    const bool *help = option_flag(&a, 'h', "help", "Show help");
-    const bool *version = option_flag(&a, 'v', "version", "Print version");
-    const long *l = option_long(&a, 'l', "long", "A long option", true, 0);
-    const float *f = option_float(&a, 'f', "float", "A float option", true, 0.0F);
-    const char **s = option_string(&a, 's', "str", "A string option", true, NULL);
-    const char **p = option_path(&a, 'p', "path", "A path option", true, NULL);
+    // All options take: args*, long name, description, and zero or more named arguments.
+    // Named arguments are set through designated initializer: `.name1 = value1, .name2 = value2`,
+    // with default value 0 / '\0' / false / NULL depending on the type.
+    // Named arguments: short_name, required, default_value.
+    const bool *help = option_flag(&a, "help", "Show help", .short_name = 'h');
+    const bool *version = option_flag(&a, "version", "Print version", .short_name = 'v');
+    const long *l = option_long(&a, "long", "A long option", .short_name = 'l', .required = false);
+    const float *f = option_float(&a, "float", "A float option", .short_name = 'f', .required = true);
+    const char **s = option_string(&a, "str", "A string option", .short_name = 's', .default_value = "string default");
+    const char **p = option_path(&a, "path", "A path option");
 
     // If enum is continuous and array matches it, result of `option_enum` can be converted directly.
     typedef enum { FIRST, SECOND, THIRD } Enum;
     const char *enum_values[] = {"first", "second", "third", NULL};
-    Enum *e = (Enum *) option_enum(&a, 'e', "enum", "An enum option", enum_values, true, FIRST);
+    const Enum *e = (const Enum *) option_enum(
+        &a, "enum", "An enum option", enum_values, .short_name = 'e', .default_value = FIRST
+    );
     // If values don't match, or the enum isn't continuous, it may be desirable to get a string instead.
-    const char **es = option_enum_string(&a, '\0', "enum-str", "A string enum option", enum_values, true, "default");
+    // Also, if values array are defined in the arguments, it must be wrapped in parenthesis.
+    const char **es = option_enum_string(
+        &a, "enum-str", "A string enum option", ((const char *[]) {"other", "enum", "values", NULL}),
+        .default_value = "default"
+    );
 
     // Parse arguments. Sets option values and returns positional arguments.
     // Handles shell completion by printing to stdout and exiting.
@@ -88,14 +98,14 @@ int main(int argc, char **argv) {
     // Define options.
     const auto &help = args.option_flag('h', "help", "Show help");
     const auto &version = args.option_flag('v', "version", "Print version");
-    const auto &l = args.option_long('l', "long", "A long option", true, 0);
-    const auto &f = args.option_float('f', "float", "A float option", true, 0.0F);
-    const auto &s = args.option_string('s', "str", "A string option", true, nullptr);
-    const auto &p = args.option_path('p', "path", "A path option", true, nullptr);
+    const auto &l = args.option_long('l', "long", "A long option");
+    const auto &f = args.option_float('f', "float", "A float option");
+    const auto &s = args.option_string('s', "str", "A string option");
+    const auto &p = args.option_path('p', "path", "A path option");
 
     const char *enum_values[] = {"first", "sed", "third", nullptr};
-    const auto &e = args.option_enum('e', "enum", "An enum option", enum_values, true);
-    const auto &es = args.option_enum_string('\0', "enum-str", "A string enum option", enum_values, true, "default");
+    const auto &e = args.option_enum('e', "enum", "An enum option", enum_values);
+    const auto &es = args.option_enum_string('\0', "enum-str", "A string enum option", enum_values, false, "default");
 
     // Parse arguments. Sets option values and returns positional arguments.
     // Handles shell completion by printing to stdout and exiting.

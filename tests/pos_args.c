@@ -4,7 +4,7 @@
 //< 1 --opt option 2 3
 int main(int argc, char **argv) {
     Args a = {0};
-    (void) !option_string(&a, 'o', "opt", NULL, false, NULL);
+    (void) !option_string(&a, "opt", NULL, .short_name = 'o', .required = true);
 
     char **pos_args;
     int pos_args_len = parse_args(&a, argc, argv, &pos_args);

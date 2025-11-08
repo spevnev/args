@@ -6,14 +6,14 @@ int main(int argc, char **argv) {
     // Define options.
     const auto &help = args.option_flag('h', "help", "Show help");
     const auto &version = args.option_flag('v', "version", "Print version");
-    const auto &l = args.option_long('l', "long", "A long option", true, 0);
-    const auto &f = args.option_float('f', "float", "A float option", true, 0.0F);
-    const auto &s = args.option_string('s', "str", "A string option", true, nullptr);
-    const auto &p = args.option_path('p', "path", "A path option", true, nullptr);
+    const auto &l = args.option_long('l', "long", "A long option");
+    const auto &f = args.option_float('f', "float", "A float option");
+    const auto &s = args.option_string('s', "str", "A string option");
+    const auto &p = args.option_path('p', "path", "A path option");
 
     const char *enum_values[] = {"first", "sed", "third", nullptr};
-    const auto &e = args.option_enum('e', "enum", "An enum option", enum_values, true);
-    const auto &es = args.option_enum_string('\0', "enum-str", "A string enum option", enum_values, true, "default");
+    const auto &e = args.option_enum('e', "enum", "An enum option", enum_values);
+    const auto &es = args.option_enum_string('\0', "enum-str", "A string enum option", enum_values, false, "default");
 
     // Parse arguments. Sets option values and returns positional arguments.
     // Handles shell completion by printing to stdout and exiting.

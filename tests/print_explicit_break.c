@@ -8,8 +8,8 @@
 int main(int argc, char **argv) {
     Args a = {0};
     (void) !option_flag(
-        &a, 'o', "opt",
-        "Option with a very long description\nthat is explicitly split into multiple\nlines using '\\n'."
+        &a, "opt", "Option with a very long description\nthat is explicitly split into multiple\nlines using '\\n'.",
+        .short_name = 'o'
     );
 
     parse_args(&a, argc, argv, NULL);

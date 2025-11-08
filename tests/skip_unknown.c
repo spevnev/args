@@ -6,7 +6,7 @@
 //< --unknown --opt 1
 int main(int argc, char **argv) {
     Args a = {0};
-    const long *opt = option_long(&a, 'o', "opt", NULL, true, 0);
+    const long *opt = option_long(&a, "opt", NULL, .short_name = 'o');
 
     int pos_args_len = parse_args(&a, argc, argv, NULL);
     assert(pos_args_len == 0);

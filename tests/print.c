@@ -13,14 +13,17 @@
 //>   -e, --enum-str               A string enum option (default: "enum default")
 int main(int argc, char **argv) {
     Args a = {0};
-    (void) !option_flag(&a, 'b', "bool", "Option with a description so long that it must be split to the second line");
-    (void) !option_long(&a, '\0', "option-with-long-name", "A long option", true, 12);
-    (void) !option_float(&a, 'f', "float", "A float option", false, 0.0F);
-    (void) !option_string(&a, '\0', "str", "A string option", true, "some default");
-    (void) !option_path(&a, 'p', "path", "A path option", true, NULL);
-    (void) !option_enum(&a, '\0', "enum-idx", "An index enum option", (const char *[]) {NULL}, true, -1ULL);
+    (void) !option_flag(
+        &a, "bool", "Option with a description so long that it must be split to the second line", .short_name = 'b'
+    );
+    (void) !option_long(&a, "option-with-long-name", "A long option", .default_value = 12);
+    (void) !option_float(&a, "float", "A float option", .short_name = 'f', .required = true);
+    (void) !option_string(&a, "str", "A string option", .default_value = "some default");
+    (void) !option_path(&a, "path", "A path option", .short_name = 'p');
+    (void) !option_enum(&a, "enum-idx", "An index enum option", (const char *[]) {NULL}, .default_value = -1);
     (void) !option_enum_string(
-        &a, 'e', "enum-str", "A string enum option", (const char *[]) {NULL}, true, "enum default"
+        &a, "enum-str", "A string enum option", (const char *[]) {NULL}, .short_name = 'e',
+        .default_value = "enum default"
     );
 
     parse_args(&a, argc, argv, NULL);

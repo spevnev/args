@@ -4,10 +4,10 @@
 //< --long1 first --long2=second -s third
 int main(int argc, char **argv) {
     Args a = {0};
-    const char **l1 = option_path(&a, '\0', "long1", NULL, false, NULL);
-    const char **l2 = option_path(&a, '\0', "long2", NULL, false, NULL);
-    const char **s = option_path(&a, 's', "long3", NULL, false, NULL);
-    const char **d = option_path(&a, '\0', "long4", NULL, true, "fourth");
+    const char **l1 = option_path(&a, "long1", NULL, .required = true);
+    const char **l2 = option_path(&a, "long2", NULL, .required = true);
+    const char **s = option_path(&a, "long3", NULL, .short_name = 's', .required = true);
+    const char **d = option_path(&a, "long4", NULL, .default_value = "fourth");
 
     int pos_args_len = parse_args(&a, argc, argv, NULL);
     assert(pos_args_len == 0);

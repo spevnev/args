@@ -4,10 +4,10 @@
 //< --long1 1 --long2=0x2 -s 03
 int main(int argc, char **argv) {
     Args a = {0};
-    const long *l1 = option_long(&a, '\0', "long1", NULL, false, 0);
-    const long *l2 = option_long(&a, '\0', "long2", NULL, false, 0);
-    const long *s = option_long(&a, 's', "long3", NULL, false, 0);
-    const long *d = option_long(&a, '\0', "long4", NULL, true, 4);
+    const long *l1 = option_long(&a, "long1", NULL, .required = true);
+    const long *l2 = option_long(&a, "long2", NULL, .required = true);
+    const long *s = option_long(&a, "long3", NULL, .short_name = 's', .required = true);
+    const long *d = option_long(&a, "long4", NULL, .default_value = 4);
 
     int pos_args_len = parse_args(&a, argc, argv, NULL);
     assert(pos_args_len == 0);

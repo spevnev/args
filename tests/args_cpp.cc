@@ -15,13 +15,13 @@ int main(int argc, char **argv) {
     const char *ENUM_VALUES[] = {"first", "second", "third", nullptr};
 
     ArgsCpp args;
-    const auto &l = args.option_long('l', "long", nullptr, false);
-    const auto &f = args.option_float('f', "float", nullptr, false);
-    const auto &s = args.option_string('s', "str", nullptr, false);
-    const auto &p = args.option_path('p', "path", nullptr, false);
+    const auto &l = args.option_long('l', "long", nullptr, true);
+    const auto &f = args.option_float('f', "float", nullptr, true);
+    const auto &s = args.option_string('s', "str", nullptr, true);
+    const auto &p = args.option_path('p', "path", nullptr, true);
     const auto &b = args.option_flag('b', "bool", nullptr);
-    const auto &ei = args.option_enum('e', "enum", nullptr, ENUM_VALUES, false);
-    const auto &es = args.option_enum_string('E', "enum-str", nullptr, ENUM_VALUES, false);
+    const auto &ei = args.option_enum('e', "enum", nullptr, ENUM_VALUES, true);
+    const auto &es = args.option_enum_string('E', "enum-str", nullptr, ENUM_VALUES, true);
 
     char **pos_args;
     int pos_args_len = args.parse_args(argc, argv, pos_args);

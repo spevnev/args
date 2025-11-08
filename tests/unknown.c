@@ -10,7 +10,7 @@ int main(int argc, char **argv) {
     atexit(success);
 
     Args a = {0};
-    (void) !option_long(&a, 'o', "opt", NULL, true, 0);
+    (void) !option_long(&a, "opt", NULL, .short_name = 'o');
 
     parse_args(&a, argc, argv, NULL);
 
