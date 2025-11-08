@@ -96,6 +96,7 @@ typedef struct Args__Option {
 typedef struct {
     Args__Option *head;
     Args__Option *tail;
+    bool are_parsed;
     char **positional_args;
     bool options_have_short_name;
     size_t options_max_name_length;
@@ -168,6 +169,8 @@ static Args__Option *args__new_option(
     Args__Type type
 ) {
     ARGS__ASSERT(a != NULL);
+
+    if (a->are_parsed) ARGS__FATAL("New options cannot be added after parsing the arguments");
 
     if (short_name != '\0' && !isalnum(short_name)) {
         ARGS__FATAL("Invalid short name '%c'. It must be alphanumeric", short_name);
@@ -775,6 +778,7 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const char **option_enum_str(
 // On error, prints to stderr and exits.
 static int parse_args(Args *a, int argc, char **argv, char ***positional_args) {
     ARGS__ASSERT(a != NULL && argv != NULL);
+    a->are_parsed = true;
 
     ARGS__ASSERT(argc >= 0);
     if (argc == 0) ARGS__FATAL("Expected the first argument to be a program name");
