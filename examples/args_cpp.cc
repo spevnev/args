@@ -4,8 +4,8 @@ int main(int argc, char **argv) {
     ArgsCpp args;
 
     // Define options.
-    const auto &help = args.option_flag('h', "help", "Show help");
-    const auto &version = args.option_flag('v', "version", "Print version");
+    const auto &help = args.option_flag('h', "help", "Show help", true);
+    const auto &version = args.option_flag('v', "version", "Print version", true);
     const auto &l = args.option_long('l', "long", "A long option");
     const auto &f = args.option_float('f', "float", "A float option");
     const auto &s = args.option_string('s', "str", "A string option");

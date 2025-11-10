@@ -9,8 +9,8 @@ int main(int argc, char **argv) {
     // Named arguments are set through designated initializer: `.name1 = value1, .name2 = value2`,
     // with default value 0 / '\0' / false / NULL depending on the type.
     // Named arguments: short_name, required, default_value.
-    const bool *help = option_flag(&a, "help", "Show help", .short_name = 'h');
-    const bool *version = option_flag(&a, "version", "Print version", .short_name = 'v');
+    const bool *help = option_flag(&a, "help", "Show help", .short_name = 'h', .ignore_required = true);
+    const bool *version = option_flag(&a, "version", "Print version", .short_name = 'v', .ignore_required = true);
     const long *l = option_long(&a, "long", "A long option", .short_name = 'l', .required = false);
     const float *f = option_float(&a, "float", "A float option", .short_name = 'f', .required = true);
     const char **s = option_string(&a, "str", "A string option", .short_name = 's', .default_value = "string default");

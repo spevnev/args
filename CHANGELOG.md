@@ -10,6 +10,10 @@
 - Rename `option_str` and `option_enum_str` to `option_string` and `option_enum_string`
 - Reorder `option_enum` arguments
 
+### Added
+
+- `ignore_required` named argument for `option_flag`, intended for flags like `help` and `version`
+
 ## [1.3.0](https://github.com/spevnev/args/releases/tag/v1.3.0)
 
 ### Added

@@ -81,7 +81,10 @@ typedef struct Args__Option {
         long long_;
         float float_;
         char *string;
-        bool bool_;
+        struct {
+            bool value;
+            bool ignore_required;
+        } bool_;
         struct {
             char **values;
             unsigned int length;
@@ -317,6 +320,7 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const char **args__option_str
 
 typedef struct {
     char short_name;
+    bool ignore_required;
 } Args__OptionFlagArgs;
 
 ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const bool *args__option_flag(
@@ -327,8 +331,9 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const bool *args__option_flag
 ) {
     ARGS__ASSERT(a != NULL);
     Args__Option *option = args__new_option(a, long_name, description, args.short_name, false, ARGS__TYPE_BOOL);
-    option->value.bool_ = false;
-    return &option->value.bool_;
+    option->value.bool_.value = false;
+    option->value.bool_.ignore_required = args.ignore_required;
+    return &option->value.bool_.value;
 }
 
 typedef ARGS__OPTION_ARGS_STRUCT(size_t) Args__OptionEnumArgs;
@@ -832,6 +837,7 @@ static int parse_args(Args *a, int argc, char **argv, char ***positional_args) {
         *positional_args = a->positional_args;
     }
 
+    bool ignore_required = false;
     while (argc > 0) {
         char *arg = *argv;
         size_t arg_length = strlen(arg);
@@ -872,7 +878,8 @@ static int parse_args(Args *a, int argc, char **argv, char ***positional_args) {
 
             if (option->type == ARGS__TYPE_BOOL) {
                 if (arg[option_length] == '=') ARGS__FATAL("Flags cannot have a value: \"%s\"", arg);
-                option->value.bool_ = true;
+                option->value.bool_.value = true;
+                if (option->value.bool_.ignore_required) ignore_required = true;
                 continue;
             }
 
@@ -910,7 +917,8 @@ static int parse_args(Args *a, int argc, char **argv, char ***positional_args) {
                 option->is_set = true;
 
                 if (option->type == ARGS__TYPE_BOOL) {
-                    option->value.bool_ = true;
+                    option->value.bool_.value = true;
+                    if (option->value.bool_.ignore_required) ignore_required = true;
                     continue;
                 }
 
@@ -930,8 +938,12 @@ static int parse_args(Args *a, int argc, char **argv, char ***positional_args) {
         }
     }
 
-    for (Args__Option *option = a->head; option != NULL; option = option->next) {
-        if (option->is_required && !option->is_set) ARGS__FATAL("Missing a required option \"%s\"", option->long_name);
+    if (!ignore_required) {
+        for (Args__Option *option = a->head; option != NULL; option = option->next) {
+            if (option->is_required && !option->is_set) {
+                ARGS__FATAL("Missing a required option \"%s\"", option->long_name);
+            }
+        }
     }
 
     return positional_args_index;
@@ -1178,10 +1190,12 @@ public:
     ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT const bool &option_flag(
         char short_name,
         const char *long_name,
-        const char *description
+        const char *description,
+        bool ignore_required = false
     ) {
         Args__OptionFlagArgs option_args{};
         option_args.short_name = short_name;
+        option_args.ignore_required = ignore_required;
         return *args__option_flag(option_args, &args, long_name, description);
     }
 
