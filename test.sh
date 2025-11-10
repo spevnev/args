@@ -31,22 +31,24 @@ for file in $(find $SRC_DIR -type f); do
 
     # Mac/BSD xargs does not run command if stdin is empty.
     if [ -z "$input" ]; then
-        output=$($bin 2>&1 | tr -d '\r')
+        output=$($bin 2>&1)
     else
-        output=$(echo "$input" | xargs $bin 2>&1 | tr -d '\r')
+        output=$(echo "$input" | xargs $bin 2>&1)
     fi
 
-    if [ $? -eq 0 ] && [ "$output" = "$expected_output" ]; then
-        echo -e $GREEN"[PASSED] $name"$RESET
-        ((passed += 1))
-    else
-        echo -e $RED"[FAILED] $name"$RESET
+    if [ $? -ne 0 ]; then
+        echo -e $RED"[FAILED] $name: non-zero exit code"$RESET
         ((failed += 1))
-
+    elif ! [ "$(echo "$output" | tr -d '\r')" = "$expected_output" ]; then
+        echo -e $RED"[FAILED] $name: wrong output"$RESET
         echo -e $BLUE"Expected:"$RESET
         echo "$expected_output"
         echo -e $BLUE"Found:"$RESET
         echo "$output"
+        ((failed += 1))
+    else
+        echo -e $GREEN"[PASSED] $name"$RESET
+        ((passed += 1))
     fi
 done
 
