@@ -70,6 +70,7 @@ typedef struct Args__Option {
     bool is_required;
     bool is_set;
     bool is_matching;
+    bool is_hidden;
     Args__Type type;
     union {
         long long_;
@@ -180,7 +181,8 @@ static void args__set_enum_values(Args__Option *option, const char **values) {
                 ARGS__FATAL(
                     "Enum value of \"%s\" contains an invalid character 0x%x. "
                     "Maybe enum array is missing a NULL-terminator",
-                    option->long_name, *c
+                    option->long_name,
+                    *c
                 );
             }
         }
@@ -194,6 +196,7 @@ static Args__Option *args__new_option(
     const char *description,
     char short_name,
     bool is_required,
+    bool is_hidden,
     Args__Type type
 ) {
     ARGS__ASSERT(a != NULL);
@@ -229,13 +232,16 @@ static Args__Option *args__new_option(
     option->long_name = args__strdup(long_name);
     option->description = description == NULL ? NULL : args__strdup(description);
     option->is_required = is_required;
+    option->is_hidden = is_hidden;
     option->is_set = false;
     option->is_matching = false;
     option->type = type;
 
-    size_t name_length = strlen(option->long_name);
-    if (name_length > a->options_max_name_length) a->options_max_name_length = name_length;
-    if (short_name != '\0') a->options_have_short_name = true;
+    if (!option->is_hidden) {
+        size_t name_length = strlen(option->long_name);
+        if (name_length > a->options_max_name_length) a->options_max_name_length = name_length;
+        if (short_name != '\0') a->options_have_short_name = true;
+    }
 
     if (a->head == NULL) {
         a->head = option;
@@ -265,6 +271,7 @@ static Args__Option *args__new_option(
     struct {                                      \
         char short_name;                          \
         bool required;                            \
+        bool hidden;                              \
         default_value_t default_value;            \
     }
 
@@ -277,7 +284,15 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const long *args__option_long
     const char *description
 ) {
     ARGS__ASSERT(a != NULL);
-    Args__Option *option = args__new_option(a, long_name, description, args.short_name, args.required, ARGS__TYPE_LONG);
+    Args__Option *option = args__new_option(
+        a,
+        long_name,
+        description,
+        args.short_name,
+        args.required,
+        args.hidden,
+        ARGS__TYPE_LONG
+    );
     option->default_value.long_ = option->value.long_ = args.default_value;
     return &option->value.long_;
 }
@@ -291,8 +306,15 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const float *args__option_flo
     const char *description
 ) {
     ARGS__ASSERT(a != NULL);
-    Args__Option *option
-        = args__new_option(a, long_name, description, args.short_name, args.required, ARGS__TYPE_FLOAT);
+    Args__Option *option = args__new_option(
+        a,
+        long_name,
+        description,
+        args.short_name,
+        args.required,
+        args.hidden,
+        ARGS__TYPE_FLOAT
+    );
     option->default_value.float_ = option->value.float_ = args.default_value;
     return &option->value.float_;
 }
@@ -307,7 +329,15 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const char **args__option_str
     const char *description
 ) {
     ARGS__ASSERT((type == ARGS__TYPE_STRING || type == ARGS__TYPE_PATH) && a != NULL);
-    Args__Option *option = args__new_option(a, long_name, description, args.short_name, args.required, type);
+    Args__Option *option = args__new_option(
+        a,
+        long_name,
+        description,
+        args.short_name,
+        args.required,
+        args.hidden,
+        type
+    );
     if (args.default_value == NULL) {
         option->default_value.string = NULL;
         option->value.string = NULL;
@@ -321,6 +351,7 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const char **args__option_str
 typedef struct {
     char short_name;
     bool ignore_required;
+    bool hidden;
 } Args__OptionFlagArgs;
 
 ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const bool *args__option_flag(
@@ -330,7 +361,15 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const bool *args__option_flag
     const char *description
 ) {
     ARGS__ASSERT(a != NULL);
-    Args__Option *option = args__new_option(a, long_name, description, args.short_name, false, ARGS__TYPE_BOOL);
+    Args__Option *option = args__new_option(
+        a,
+        long_name,
+        description,
+        args.short_name,
+        false,
+        args.hidden,
+        ARGS__TYPE_BOOL
+    );
     option->value.bool_.value = false;
     option->value.bool_.ignore_required = args.ignore_required;
     return &option->value.bool_.value;
@@ -346,8 +385,15 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const size_t *args__option_en
     const char **values
 ) {
     ARGS__ASSERT(a != NULL && values != NULL);
-    Args__Option *option
-        = args__new_option(a, long_name, description, args.short_name, args.required, ARGS__TYPE_ENUM_INDEX);
+    Args__Option *option = args__new_option(
+        a,
+        long_name,
+        description,
+        args.short_name,
+        args.required,
+        args.hidden,
+        ARGS__TYPE_ENUM_INDEX
+    );
     args__set_enum_values(option, values);
     option->value.enum_.as.index = args.default_value;
     if (args.default_value < option->value.enum_.length) {
@@ -368,8 +414,15 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const char **args__option_enu
     const char **values
 ) {
     ARGS__ASSERT(a != NULL && values != NULL);
-    Args__Option *option
-        = args__new_option(a, long_name, description, args.short_name, args.required, ARGS__TYPE_ENUM_STRING);
+    Args__Option *option = args__new_option(
+        a,
+        long_name,
+        description,
+        args.short_name,
+        args.required,
+        args.hidden,
+        ARGS__TYPE_ENUM_STRING
+    );
     option->default_value.enum_ = args.default_value == NULL ? NULL : args__strdup(args.default_value);
     args__set_enum_values(option, values);
     option->value.enum_.as.value = option->default_value.enum_;
@@ -470,7 +523,10 @@ static void args__bash_completion_script(const char *program_name) {
         "}\n"
         "\n"
         "complete -F _%s %s\n",
-        program_name, program_name, program_name, program_name
+        program_name,
+        program_name,
+        program_name,
+        program_name
     );
 }
 
@@ -485,7 +541,10 @@ static void args__zsh_completion_script(const char *program_name) {
         "}\n"
         "\n"
         "_%s\n",
-        program_name, program_name, program_name, program_name
+        program_name,
+        program_name,
+        program_name,
+        program_name
     );
 }
 
@@ -497,7 +556,9 @@ static void args__fish_completion_script(const char *program_name) {
         "for args in (%s __complete fish 2>/dev/null)\n"
         "    eval \"complete -c %s $args\"\n"
         "end\n",
-        program_name, program_name, program_name
+        program_name,
+        program_name,
+        program_name
     );
 }
 
@@ -779,7 +840,9 @@ static int parse_args(Args *a, int argc, char **argv, char ***positional_args) {
             if (i->short_name == j->short_name && i->short_name != '\0') {
                 ARGS__FATAL(
                     "Duplicate short name '%c' in options \"%s\" and \"%s\"",  //
-                    i->short_name, i->long_name, j->long_name
+                    i->short_name,
+                    i->long_name,
+                    j->long_name
                 );
             }
 
@@ -959,6 +1022,8 @@ ARGS__MAYBE_UNUSED static void print_options(Args *a, FILE *fp) {
 
     fprintf(fp, "Options:\n");
     for (Args__Option *option = a->head; option != NULL; option = option->next) {
+        if (option->is_hidden) continue;
+
 #ifdef ARGS_HIDE_DEFAULTS
         bool print_defaults = false;
 #else
@@ -1047,42 +1112,52 @@ ARGS__MAYBE_UNUSED static void print_options(Args *a, FILE *fp) {
 
 // Defines a long option, returns a pointer set by `parse_args`.
 // Exits if `a` or `long_name` is NULL, or out of memory.
-#define option_long(a, long_name, ...)                                                                         \
-    args__option_long(                                                                                         \
-        ARGS__ZERO_OR_DESIGNATED(Args__OptionLongArgs, __VA_ARGS__) a, long_name, ARGS__GET_FIRST(__VA_ARGS__) \
+#define option_long(a, long_name, ...)                                 \
+    args__option_long(                                                 \
+        ARGS__ZERO_OR_DESIGNATED(Args__OptionLongArgs, __VA_ARGS__) a, \
+        long_name,                                                     \
+        ARGS__GET_FIRST(__VA_ARGS__)                                   \
     )
 
 // Defines a float option, returns a pointer set by `parse_args`.
 // Exits if `a` or `long_name` is NULL, or out of memory.
-#define option_float(a, long_name, ...)                                                                         \
-    args__option_float(                                                                                         \
-        ARGS__ZERO_OR_DESIGNATED(Args__OptionFloatArgs, __VA_ARGS__) a, long_name, ARGS__GET_FIRST(__VA_ARGS__) \
+#define option_float(a, long_name, ...)                                 \
+    args__option_float(                                                 \
+        ARGS__ZERO_OR_DESIGNATED(Args__OptionFloatArgs, __VA_ARGS__) a, \
+        long_name,                                                      \
+        ARGS__GET_FIRST(__VA_ARGS__)                                    \
     )
 
 // Defines a string option, returns a pointer set by `parse_args`.
 // String memory is owned by library, freed by `free_args`.
 // Result can be NULL only if default value is NULL.
 // Exits if `a` or `long_name` is NULL, or out of memory.
-#define option_string(a, long_name, ...)                                                               \
-    args__option_string(                                                                               \
-        ARGS__ZERO_OR_DESIGNATED(Args__OptionStringArgs, __VA_ARGS__) ARGS__TYPE_STRING, a, long_name, \
-        ARGS__GET_FIRST(__VA_ARGS__)                                                                   \
+#define option_string(a, long_name, ...)                                                 \
+    args__option_string(                                                                 \
+        ARGS__ZERO_OR_DESIGNATED(Args__OptionStringArgs, __VA_ARGS__) ARGS__TYPE_STRING, \
+        a,                                                                               \
+        long_name,                                                                       \
+        ARGS__GET_FIRST(__VA_ARGS__)                                                     \
     )
 
 // Same as `option_string` except that shell completion will suggest paths.
 // Does NOT check that the value is a path.
-#define option_path(a, long_name, ...)                                                               \
-    args__option_string(                                                                             \
-        ARGS__ZERO_OR_DESIGNATED(Args__OptionStringArgs, __VA_ARGS__) ARGS__TYPE_PATH, a, long_name, \
-        ARGS__GET_FIRST(__VA_ARGS__)                                                                 \
+#define option_path(a, long_name, ...)                                                 \
+    args__option_string(                                                               \
+        ARGS__ZERO_OR_DESIGNATED(Args__OptionStringArgs, __VA_ARGS__) ARGS__TYPE_PATH, \
+        a,                                                                             \
+        long_name,                                                                     \
+        ARGS__GET_FIRST(__VA_ARGS__)                                                   \
     )
 
 // Defines a boolean flag, returns a pointer set by `parse_args`.
 // It is always not required, and defaults to false.
 // Exits if `a` or `long_name` is NULL, or out of memory.
-#define option_flag(a, long_name, ...)                                                                         \
-    args__option_flag(                                                                                         \
-        ARGS__ZERO_OR_DESIGNATED(Args__OptionFlagArgs, __VA_ARGS__) a, long_name, ARGS__GET_FIRST(__VA_ARGS__) \
+#define option_flag(a, long_name, ...)                                 \
+    args__option_flag(                                                 \
+        ARGS__ZERO_OR_DESIGNATED(Args__OptionFlagArgs, __VA_ARGS__) a, \
+        long_name,                                                     \
+        ARGS__GET_FIRST(__VA_ARGS__)                                   \
     )
 
 // Defines an enum option, returns a pointer set by `parse_args`.
@@ -1090,10 +1165,12 @@ ARGS__MAYBE_UNUSED static void print_options(Args *a, FILE *fp) {
 // `values` must be a NULL-terminated array, matched case-insensitively.
 // When `values` array is defined in arguments, it must be wrapped in parenthesis.
 // Exits if `a`, `long_name`, or `values` is NULL, or out of memory.
-#define option_enum(a, long_name, description, ...)                                            \
-    args__option_enum(                                                                         \
-        ARGS__ZERO_OR_DESIGNATED(Args__OptionEnumArgs, __VA_ARGS__) a, long_name, description, \
-        ARGS__GET_FIRST(__VA_ARGS__)                                                           \
+#define option_enum(a, long_name, description, ...)                    \
+    args__option_enum(                                                 \
+        ARGS__ZERO_OR_DESIGNATED(Args__OptionEnumArgs, __VA_ARGS__) a, \
+        long_name,                                                     \
+        description,                                                   \
+        ARGS__GET_FIRST(__VA_ARGS__)                                   \
     )
 
 // Defines an enum option, returns a pointer set by `parse_args`.
@@ -1102,10 +1179,12 @@ ARGS__MAYBE_UNUSED static void print_options(Args *a, FILE *fp) {
 // `values` must be a NULL-terminated array, matched case-insensitively.
 // When `values` array is defined in arguments, it must be wrapped in parenthesis.
 // Exits if `a`, `long_name`, or `values` is NULL, or out of memory.
-#define option_enum_string(a, long_name, description, ...)                                           \
-    args__option_enum_string(                                                                        \
-        ARGS__ZERO_OR_DESIGNATED(Args__OptionEnumStringArgs, __VA_ARGS__) a, long_name, description, \
-        ARGS__GET_FIRST(__VA_ARGS__)                                                                 \
+#define option_enum_string(a, long_name, description, ...)                   \
+    args__option_enum_string(                                                \
+        ARGS__ZERO_OR_DESIGNATED(Args__OptionEnumStringArgs, __VA_ARGS__) a, \
+        long_name,                                                           \
+        description,                                                         \
+        ARGS__GET_FIRST(__VA_ARGS__)                                         \
     )
 
 #else  // __cplusplus
