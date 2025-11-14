@@ -5,7 +5,7 @@ OUT_DIR      := build
 COMMON_FLAGS := -Wall -Wextra -Werror -pedantic -Isrc -O0
 
 ifndef NO_FSANITIZE
-	COMMON_FLAGS += -fsanitize=address,leak,undefined
+	COMMON_FLAGS += -g3 -fsanitize=address,leak,undefined
 endif
 
 CFLAGS       := $(COMMON_FLAGS) -std=c99

@@ -5,7 +5,7 @@
 static void success(void) { _exit(EXIT_SUCCESS); }
 
 //< --opt 1 -o 2 --opt 3
-//> ERROR: Option 'o' is set more than once.
+//> ERROR: Option "opt" is already set: "-o".
 int main(int argc, char **argv) {
     atexit(success);
 

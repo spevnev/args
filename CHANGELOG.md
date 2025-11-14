@@ -12,7 +12,7 @@
 
 ### Added
 
-- `ignore_required` named argument for `option_flag`, intended for flags like `help` and `version`
+- `option_help` and `option_version`
 - `hidden` to hide option from `print_options`, intended for deprecated or developer options
 
 ## [1.3.0](https://github.com/spevnev/args/releases/tag/v1.3.0)

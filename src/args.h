@@ -85,6 +85,8 @@ typedef struct Args__Option {
         struct {
             bool value;
             bool ignore_required;
+            bool is_help;
+            bool is_version;
         } bool_;
         struct {
             char **values;
@@ -97,14 +99,20 @@ typedef struct Args__Option {
     } value;
 } Args__Option;
 
-typedef struct {
+typedef struct Args Args;
+
+typedef void (*Args__HelpCallback)(Args *, const char *);
+
+struct Args {
     Args__Option *head;
     Args__Option *tail;
     char **positional_args;
     bool are_parsed;
     bool options_have_short_name;
     size_t options_max_name_length;
-} Args;
+    Args__HelpCallback help_callback;
+    char *version_string;
+};
 
 #ifdef __has_attribute
 #define ARGS__HAS_ATTRIBUTE(attribute) __has_attribute(attribute)
@@ -425,6 +433,49 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const char **args__option_enu
     return &option->value.enum_.as.value;
 }
 
+typedef struct {
+    bool is_short;
+    union {
+        char short_name;
+        struct {
+            const char *start;
+            size_t length;
+        } long_;
+    } as;
+    const char *arg;
+    const char *value;
+} Args__ParsedOption;
+
+typedef struct {
+    Args__ParsedOption *data;
+    size_t length;
+    size_t capacity;
+} Args__ParsedOptionVec;
+
+static void args__parsed_vec_push(Args__ParsedOptionVec *vec, Args__ParsedOption element) {
+    ARGS__ASSERT(vec != NULL);
+
+    const size_t INITIAL_VECTOR_CAPACITY = 8;
+    if (vec->length >= vec->capacity) {
+        vec->capacity = vec->capacity == 0 ? INITIAL_VECTOR_CAPACITY : vec->capacity * 2;
+        vec->data = realloc(vec->data, vec->capacity * sizeof(*vec->data));
+        if (vec->data == NULL) ARGS__OUT_OF_MEMORY();
+    }
+    vec->data[vec->length++] = element;
+}
+
+static Args__Option *args__find_option(Args *a, Args__ParsedOption option) {
+    ARGS__ASSERT(a != NULL);
+    for (Args__Option *i = a->head; i != NULL; i = i->next) {
+        if (option.is_short) {
+            if (i->short_name == option.as.short_name) return i;
+        } else {
+            if (strncmp(i->long_name, option.as.long_.start, option.as.long_.length) == 0) return i;
+        }
+    }
+    return NULL;
+}
+
 static void args__parse_value(Args__Option *option, const char *value) {
     ARGS__ASSERT(option != NULL && value != NULL);
     switch (option->type) {
@@ -720,7 +771,7 @@ static void args__bash_complete(Args *a, const char *prev, const char *cur, cons
             case ARGS__TYPE_ENUM_STRING:
                 for (size_t i = 0; i < option->value.enum_.length; i++) {
                     const char *value = option->value.enum_.values[i];
-                    if (strlen(value) >= cur_length && strncmp(value, cur, cur_length) == 0) {
+                    if (strlen(value) >= cur_length && strncasecmp(value, cur, cur_length) == 0) {
                         printf("%s\n", value);
                     }
                 }
@@ -854,6 +905,8 @@ static void free_args(Args *a) {
 
     free(a->positional_args);
     a->positional_args = NULL;
+
+    free(a->version_string);
 }
 
 // Parses arguments, sets option-returned values.
@@ -872,6 +925,7 @@ static int parse_args(Args *a, int argc, char **argv, char ***positional_args) {
     argc--;
     argv++;
 
+    // Check duplicate options.
     for (Args__Option *i = a->head; i != NULL; i = i->next) {
         for (Args__Option *j = i->next; j != NULL; j = j->next) {
             if (i->short_name == j->short_name && i->short_name != '\0') {
@@ -888,6 +942,7 @@ static int parse_args(Args *a, int argc, char **argv, char ***positional_args) {
     }
 
 #ifndef ARGS_DISABLE_COMPLETION
+    // Handle shell completion.
     if (argc >= 1) {
         if (strcmp(argv[0], "completion") == 0) {
             args__handle_completion(argc, argv, program_name);
@@ -908,107 +963,133 @@ static int parse_args(Args *a, int argc, char **argv, char ***positional_args) {
         *positional_args = a->positional_args;
     }
 
-    bool ignore_required = false;
+    // Parse arguments without validation and errors.
+    Args__ParsedOptionVec parsed = {0};
     while (argc > 0) {
-        char *arg = *argv;
-        size_t arg_length = strlen(arg);
-        ARGS__MAYBE_UNUSED const char *full_arg = arg;
+        char *arg = *argv++;
         argc--;
-        argv++;
 
-        if (arg_length < 2 || arg[0] != '-') {
+        size_t arg_length = strlen(arg);
+        if (arg_length <= 1 || arg[0] != '-') {
             if (positional_args != NULL) (*positional_args)[positional_args_index] = arg;
             positional_args_index++;
             continue;
         }
 
+        const char *full_arg = arg;
         if (arg[1] == '-') {
             arg += 2;
             arg_length -= 2;
 
-            Args__Option *option = a->head;
-            size_t option_length;
-            while (option != NULL) {
-                option_length = strlen(option->long_name);
-                if (strncmp(arg, option->long_name, option_length) == 0
-                    && (arg[option_length] == '\0' || arg[option_length] == '=')) {
-                    break;
+            const char *equals = strchr(arg, '=');
+            if (equals != NULL) arg_length = equals - arg;
+
+            Args__ParsedOption cur = {
+                .is_short = false,
+                .as.long_ = {
+                    .start = arg,
+                    .length = arg_length,
+                },
+                .arg = full_arg,
+                .value = NULL,
+            };
+
+            if (equals != NULL) {
+                cur.value = equals + 1;
+            } else if (argc > 0) {
+                Args__Option *option = args__find_option(a, cur);
+                if (option != NULL && option->type != ARGS__TYPE_BOOL) {
+                    cur.value = *argv++;
+                    argc--;
                 }
-                option = option->next;
-            }
-#ifdef ARGS_SKIP_UNKNOWN
-            if (option == NULL) continue;
-#else
-            if (option == NULL) ARGS__FATAL("Unknown or invalid option \"%s\"", full_arg);
-#endif
-
-#ifndef ARGS_ALLOW_OVERWRITING
-            if (option->is_set) ARGS__FATAL("Option \"%s\" is set more than once", option->long_name);
-#endif
-            option->is_set = true;
-
-            if (option->type == ARGS__TYPE_BOOL) {
-                if (arg[option_length] == '=') ARGS__FATAL("Flags cannot have a value: \"%s\"", arg);
-                option->value.bool_.value = true;
-                if (option->value.bool_.ignore_required) ignore_required = true;
-                continue;
             }
 
-            const char *value;
-            if (arg[option_length] == '=') {
-                value = arg + option_length + 1;
-            } else {
-                if (argc == 0) ARGS__FATAL("Option \"%s\" is missing a value", option->long_name);
-                value = *argv;
-                argc--;
-                argv++;
-            }
-
-            args__parse_value(option, value);
+            args__parsed_vec_push(&parsed, cur);
         } else {
             arg++;
             arg_length--;
             while (arg_length > 0) {
-                char ch = *arg;
-                arg++;
+                char ch = *arg++;
                 arg_length--;
 
-                Args__Option *option = a->head;
-                while (option != NULL && option->short_name != ch) option = option->next;
+                Args__ParsedOption cur = {
+                    .is_short = true,
+                    .as.short_name = ch,
+                    .arg = full_arg,
+                    .value = NULL,
+                };
 
-#ifdef ARGS_SKIP_UNKNOWN
-                if (option == NULL) continue;
-#else
-                if (option == NULL) ARGS__FATAL("Unknown or invalid option '%c' in \"%s\"", ch, full_arg);
-#endif
-
-#ifndef ARGS_ALLOW_OVERWRITING
-                if (option->is_set) ARGS__FATAL("Option '%c' is set more than once", option->short_name);
-#endif
-                option->is_set = true;
-
-                if (option->type == ARGS__TYPE_BOOL) {
-                    option->value.bool_.value = true;
-                    if (option->value.bool_.ignore_required) ignore_required = true;
-                    continue;
+                Args__Option *option = args__find_option(a, cur);
+                if (option == NULL || option->type != ARGS__TYPE_BOOL) {
+                    if (arg_length > 0) {
+                        cur.value = arg;
+                        arg_length = 0;
+                    } else if (argc > 0) {
+                        cur.value = *argv++;
+                        argc--;
+                    }
                 }
 
-                const char *value;
-                if (arg_length > 0) {
-                    value = arg;
-                    arg_length = 0;
-                } else {
-                    if (argc == 0) ARGS__FATAL("Option '%c' is missing a value", option->short_name);
-                    value = *argv;
-                    argc--;
-                    argv++;
-                }
-
-                args__parse_value(option, value);
+                args__parsed_vec_push(&parsed, cur);
             }
         }
     }
 
+    // Check help and version.
+    for (size_t i = 0; i < parsed.length; i++) {
+        Args__Option *option = args__find_option(a, parsed.data[i]);
+        if (option == NULL) continue;
+        if (option->type != ARGS__TYPE_BOOL) continue;
+
+        if (option->value.bool_.is_help) {
+            ARGS__ASSERT(a->help_callback != NULL);
+            a->help_callback(a, program_name);
+            free_args(a);
+            exit(EXIT_SUCCESS);
+        }
+
+        if (option->value.bool_.is_version) {
+            ARGS__ASSERT(a->version_string != NULL);
+            printf("%s\n", a->version_string);
+            free_args(a);
+            exit(EXIT_SUCCESS);
+        }
+    }
+
+    // Validate parsed, set their values.
+    bool ignore_required = false;
+    for (size_t i = 0; i < parsed.length; i++) {
+        Args__ParsedOption cur = parsed.data[i];
+        Args__Option *option = args__find_option(a, cur);
+
+#ifdef ARGS_SKIP_UNKNOWN
+        if (option == NULL) continue;
+#else
+        if (option == NULL) {
+            if (cur.is_short && strlen(cur.arg) > 2) {
+                ARGS__FATAL("Unknown or invalid option '%c' in \"%s\"", cur.as.short_name, cur.arg);
+            } else {
+                ARGS__FATAL("Unknown or invalid option \"%s\"", cur.arg);
+            }
+        }
+#endif
+
+#ifndef ARGS_ALLOW_OVERWRITING
+        if (option->is_set) ARGS__FATAL("Option \"%s\" is already set: \"%s\"", option->long_name, cur.arg);
+#endif
+        option->is_set = true;
+
+        if (option->type == ARGS__TYPE_BOOL) {
+            if (cur.value != NULL) ARGS__FATAL("Flags cannot have a value: \"%s\"", cur.arg);
+            option->value.bool_.value = true;
+            if (option->value.bool_.ignore_required) ignore_required = true;
+        } else {
+            if (cur.value == NULL) ARGS__FATAL("Option \"%s\" is missing a value", cur.arg);
+            args__parse_value(option, cur.value);
+        }
+    }
+
+    // Check required.
     if (!ignore_required) {
         for (Args__Option *option = a->head; option != NULL; option = option->next) {
             if (option->is_required && !option->is_set) {
@@ -1017,6 +1098,7 @@ static int parse_args(Args *a, int argc, char **argv, char ***positional_args) {
         }
     }
 
+    free(parsed.data);
     return positional_args_index;
 }
 
@@ -1114,6 +1196,32 @@ ARGS__MAYBE_UNUSED static void print_options(Args *a, FILE *fp) {
         }
         fprintf(fp, "\n");
     }
+}
+
+// Defines a help option.
+// On "-h" or "--help", calls `help_callback(args*, program_name)` and exits.
+// Help flag is checked before validating other options.
+// For a different behavior, help can be handled manually using `option_flag`.
+ARGS__MAYBE_UNUSED static void option_help(Args *a, Args__HelpCallback help_callback) {
+    ARGS__ASSERT(a != NULL && help_callback != NULL);
+    if (a->are_parsed) ARGS__FATAL("New options cannot be added after parsing the arguments");
+    a->help_callback = help_callback;
+
+    Args__Option *option = args__new_option(a, "help", "Show help", 'h', false, false, ARGS__TYPE_BOOL);
+    option->value.bool_.is_help = true;
+}
+
+// Defines a version option.
+// On "-v" or "--version", prints `version_string` to stdout and exits.
+// Version flag is checked before validating other options.
+// For a different behavior, version can be handled manually using `option_flag`.
+ARGS__MAYBE_UNUSED static void option_version(Args *a, const char *version_string) {
+    ARGS__ASSERT(a != NULL && version_string != NULL);
+    if (a->are_parsed) ARGS__FATAL("New options cannot be added after parsing the arguments");
+    a->version_string = args__strdup(version_string);
+
+    Args__Option *option = args__new_option(a, "version", "Print version", 'v', false, false, ARGS__TYPE_BOOL);
+    option->value.bool_.is_version = true;
 }
 
 #ifndef __cplusplus

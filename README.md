@@ -11,19 +11,37 @@
 // examples/args.c
 #include "args.h"
 
+static const char *VERSION = "v1.3.0";
+
+static void print_help(Args *a, const char *program_name) {
+    // Print description and usage, then call `print_options`.
+    printf("%s - Example of using 'args' library\n", program_name);
+    printf("\n");
+    printf("Usage:\n");
+    printf("  %s [options]\n", program_name);
+    // Shell completions can either be left hidden and generated on install,
+    // or be exposed to user by printing it in usage and/or documentation.
+    printf("  %s completion <bash|zsh|fish>\n", program_name);
+    printf("\n");
+    print_options(a, stdout);
+}
+
 int main(int argc, char **argv) {
     // Zero-initialize library state.
     Args a = {0};
+
+    // Help flag calls the provided callback and exits.
+    option_help(&a, print_help);
+    // Version flag prints the provided string and exits.
+    option_version(&a, VERSION);
 
     // Define options.
     // All options take: args*, long name, description, and zero or more named arguments.
     // Named arguments are set through designated initializer: `.name1 = value1, .name2 = value2`,
     // with default value 0 / '\0' / false / NULL depending on the type.
     // Named arguments: short_name, required, hidden, default_value.
-    const bool *help = option_flag(&a, "help", "Show help", .short_name = 'h', .ignore_required = true);
-    const bool *version = option_flag(&a, "version", "Print version", .short_name = 'v', .ignore_required = true);
     const bool *hidden = option_flag(&a, "hidden", NULL, .hidden = true);
-    const long *long_ = option_long(&a, "long", "A long option", .short_name = 'l');
+    const long *long_ = option_long(&a, "long", "A long option", .default_value = 5, .short_name = 'l');
     const float *float_ = option_float(&a, "float", "A float option", .short_name = 'f', .required = true);
     const char **string = option_string(
         &a,
@@ -56,25 +74,16 @@ int main(int argc, char **argv) {
     char **pos_args;
     int pos_args_len = parse_args(&a, argc, argv, &pos_args);
 
-    // Print help on flag or subcommand.
-    if (*help || (pos_args_len == 1 && strcmp(pos_args[0], "help") == 0)) {
-        // Print description and usage, then call `print_options`.
-        printf("%s - Example of using 'args' library\n", argv[0]);
-        printf("\n");
-        printf("Usage:\n");
-        printf("  %s [options]\n", argv[0]);
-        // Shell completions can either be left hidden and generated on install,
-        // or be exposed to user by printing it in usage and/or documentation.
-        printf("  %s completion <bash|zsh|fish>\n", argv[0]);
-        printf("\n");
-        print_options(&a, stdout);
+    // Print help on subcommand.
+    if (pos_args_len == 1 && strcmp(pos_args[0], "help") == 0) {
+        print_help(&a, argv[0]);
         free_args(&a);
         return EXIT_SUCCESS;
     }
 
-    // Similarly, print version on flag or subcommand.
-    if (*version || (pos_args_len == 1 && strcmp(pos_args[0], "version") == 0)) {
-        printf("v1.3.0\n");
+    // Print version on subcommand.
+    if (pos_args_len == 1 && strcmp(pos_args[0], "version") == 0) {
+        printf("%s\n", VERSION);
         free_args(&a);
         return EXIT_SUCCESS;
     }
