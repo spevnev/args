@@ -25,6 +25,12 @@ for file in $(find $SRC_DIR -type f); do
     name=${filename%.*}
     bin="$OUT_DIR/$name"
 
+    if ! [ -x "$bin" ]; then
+        echo -e $RED"[FAILED] $name: no executable"$RESET
+        ((failed += 1))
+        continue
+    fi
+
     input=$(grep '//< ' $file | cut -c 5-)
     # Delete trailing CR to make results match on Windows (CRLF -> LF).
     expected_output=$(grep '//> ' $file | cut -c 5- | tr -d '\r')
