@@ -64,9 +64,9 @@ typedef enum {
 
 typedef struct Args__Option {
     struct Args__Option *next;
-    char short_name;
     char *long_name;
     char *description;
+    char short_name;
     bool is_required;
     bool is_set;
     bool is_matching;
@@ -100,8 +100,8 @@ typedef struct Args__Option {
 typedef struct {
     Args__Option *head;
     Args__Option *tail;
-    bool are_parsed;
     char **positional_args;
+    bool are_parsed;
     bool options_have_short_name;
     size_t options_max_name_length;
 } Args;
@@ -227,6 +227,8 @@ static Args__Option *args__new_option(
 
     Args__Option *option = (Args__Option *) malloc(sizeof(*option));
     if (option == NULL) ARGS__OUT_OF_MEMORY();
+    memset(option, 0, sizeof(*option));
+
     option->next = NULL;
     option->short_name = short_name;
     option->long_name = args__strdup(long_name);
@@ -338,10 +340,7 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const char **args__option_str
         args.hidden,
         type
     );
-    if (args.default_value == NULL) {
-        option->default_value.string = NULL;
-        option->value.string = NULL;
-    } else {
+    if (args.default_value != NULL) {
         option->default_value.string = args__strdup(args.default_value);
         option->value.string = args__strdup(args.default_value);
     }
@@ -370,7 +369,6 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const bool *args__option_flag
         args.hidden,
         ARGS__TYPE_BOOL
     );
-    option->value.bool_.value = false;
     option->value.bool_.ignore_required = args.ignore_required;
     return &option->value.bool_.value;
 }
@@ -398,8 +396,6 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const size_t *args__option_en
     option->value.enum_.as.index = args.default_value;
     if (args.default_value < option->value.enum_.length) {
         option->default_value.enum_ = args__strdup(values[args.default_value]);
-    } else {
-        option->default_value.enum_ = NULL;
     }
     return &option->value.enum_.as.index;
 }
@@ -423,7 +419,7 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const char **args__option_enu
         args.hidden,
         ARGS__TYPE_ENUM_STRING
     );
-    option->default_value.enum_ = args.default_value == NULL ? NULL : args__strdup(args.default_value);
+    if (args.default_value != NULL) option->default_value.enum_ = args__strdup(args.default_value);
     args__set_enum_values(option, values);
     option->value.enum_.as.value = option->default_value.enum_;
     return &option->value.enum_.as.value;
@@ -562,6 +558,28 @@ static void args__fish_completion_script(const char *program_name) {
     );
 }
 
+static void args__handle_completion(int argc, char **argv, const char *program_name) {
+    ARGS__ASSERT(argc >= 1 && argv != NULL && program_name != NULL);
+
+    if (argc != 2) ARGS__FATAL("Command 'completion' requires an argument: bash, zsh, fish");
+
+    for (const char *c = program_name; *c != '\0'; c++) {
+        if (isalnum(*c) || *c == '_' || *c == '.' || *c == '+' || *c == ':') continue;
+        if (*c == '-' && c != program_name) continue;
+        ARGS__FATAL("Invalid program name \"%s\"", program_name);
+    }
+
+    if (strcmp(argv[1], "bash") == 0) {
+        args__bash_completion_script(program_name);
+    } else if (strcmp(argv[1], "zsh") == 0) {
+        args__zsh_completion_script(program_name);
+    } else if (strcmp(argv[1], "fish") == 0) {
+        args__fish_completion_script(program_name);
+    } else {
+        ARGS__FATAL("Failed to generate completion script: unknown shell \"%s\"", argv[1]);
+    }
+}
+
 static void args__bash_complete(Args *a, const char *prev, const char *cur, const char *columns_string) {
     ARGS__ASSERT(a != NULL && prev != NULL && cur != NULL && columns_string != NULL);
 
@@ -695,8 +713,8 @@ static void args__bash_complete(Args *a, const char *prev, const char *cur, cons
         switch (option->type) {
             case ARGS__TYPE_LONG:
             case ARGS__TYPE_FLOAT:
-            case ARGS__TYPE_BOOL:
-            case ARGS__TYPE_STRING: printf("-\n"); break;
+            case ARGS__TYPE_STRING:
+            case ARGS__TYPE_BOOL:   printf("-\n"); break;
             case ARGS__TYPE_PATH:   break;
             case ARGS__TYPE_ENUM_INDEX:
             case ARGS__TYPE_ENUM_STRING:
@@ -777,6 +795,25 @@ static void args__fish_complete(Args *a) {
         printf("\n");
     }
 }
+
+static void args__handle_complete(Args *a, int argc, char **argv) {
+    ARGS__ASSERT(a != NULL && argc >= 1 && argv != NULL);
+
+    if (argc == 1) ARGS__FATAL("Command '__complete' requires an argument: bash, zsh, fish");
+
+    if (strcmp(argv[1], "bash") == 0) {
+        if (argc != 5) ARGS__FATAL("Command '__complete bash' requires arguments '<prev> <cur> <columns>'");
+        args__bash_complete(a, argv[2], argv[3], argv[4]);
+    } else if (strcmp(argv[1], "zsh") == 0) {
+        if (argc > 2) ARGS__FATAL("Command '__complete zsh' doesn't take arguments");
+        args__zsh_complete(a);
+    } else if (strcmp(argv[1], "fish") == 0) {
+        if (argc > 2) ARGS__FATAL("Command '__complete fish' doesn't take arguments");
+        args__fish_complete(a);
+    } else {
+        ARGS__FATAL("Failed to generate completions: unknown shell \"%s\"", argv[1]);
+    }
+}
 #endif
 
 // ====================================================================================================================
@@ -839,7 +876,7 @@ static int parse_args(Args *a, int argc, char **argv, char ***positional_args) {
         for (Args__Option *j = i->next; j != NULL; j = j->next) {
             if (i->short_name == j->short_name && i->short_name != '\0') {
                 ARGS__FATAL(
-                    "Duplicate short name '%c' in options \"%s\" and \"%s\"",  //
+                    "Duplicate short name '%c' in options \"%s\" and \"%s\"",
                     i->short_name,
                     i->long_name,
                     j->long_name
@@ -851,45 +888,16 @@ static int parse_args(Args *a, int argc, char **argv, char ***positional_args) {
     }
 
 #ifndef ARGS_DISABLE_COMPLETION
-    if (argc >= 1 && strcmp(argv[0], "completion") == 0) {
-        if (argc != 2) ARGS__FATAL("Command 'completion' requires an argument: bash, zsh, fish");
-
-        for (const char *c = program_name; *c != '\0'; c++) {
-            if (isalnum(*c) || *c == '_' || *c == '.' || *c == '+' || *c == ':') continue;
-            if (*c == '-' && c != program_name) continue;
-            ARGS__FATAL("Invalid program name \"%s\"", program_name);
+    if (argc >= 1) {
+        if (strcmp(argv[0], "completion") == 0) {
+            args__handle_completion(argc, argv, program_name);
+            free_args(a);
+            exit(EXIT_SUCCESS);
+        } else if (strcmp(argv[0], "__complete") == 0) {
+            args__handle_complete(a, argc, argv);
+            free_args(a);
+            exit(EXIT_SUCCESS);
         }
-
-        if (strcmp(argv[1], "bash") == 0) {
-            args__bash_completion_script(program_name);
-        } else if (strcmp(argv[1], "zsh") == 0) {
-            args__zsh_completion_script(program_name);
-        } else if (strcmp(argv[1], "fish") == 0) {
-            args__fish_completion_script(program_name);
-        } else {
-            ARGS__FATAL("Failed to generate completion script: unknown shell \"%s\"", argv[1]);
-        }
-        free_args(a);
-        exit(EXIT_SUCCESS);
-    }
-
-    if (argc >= 1 && strcmp(argv[0], "__complete") == 0) {
-        if (argc == 1) ARGS__FATAL("Command '__complete' requires an argument: bash, zsh, fish");
-
-        if (strcmp(argv[1], "bash") == 0) {
-            if (argc != 5) ARGS__FATAL("Command '__complete bash' requires arguments '<prev> <cur> <columns>'");
-            args__bash_complete(a, argv[2], argv[3], argv[4]);
-        } else if (strcmp(argv[1], "zsh") == 0) {
-            if (argc > 2) ARGS__FATAL("Command '__complete zsh' doesn't take arguments");
-            args__zsh_complete(a);
-        } else if (strcmp(argv[1], "fish") == 0) {
-            if (argc > 2) ARGS__FATAL("Command '__complete fish' doesn't take arguments");
-            args__fish_complete(a);
-        } else {
-            ARGS__FATAL("Failed to generate completions: unknown shell \"%s\"", argv[1]);
-        }
-        free_args(a);
-        exit(EXIT_SUCCESS);
     }
 #endif
 
