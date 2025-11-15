@@ -1063,9 +1063,6 @@ static int parse_args(Args *a, int argc, char **argv, char ***positional_args) {
         Args__ParsedOption cur = parsed.data[i];
         Args__Option *option = args__find_option(a, cur);
 
-#ifdef ARGS_SKIP_UNKNOWN
-        if (option == NULL) continue;
-#else
         if (option == NULL) {
             if (cur.is_short && strlen(cur.arg) > 2) {
                 ARGS__FATAL("Unknown or invalid option '%c' in \"%s\"", cur.as.short_name, cur.arg);
@@ -1073,7 +1070,6 @@ static int parse_args(Args *a, int argc, char **argv, char ***positional_args) {
                 ARGS__FATAL("Unknown or invalid option \"%s\"", cur.arg);
             }
         }
-#endif
 
 #ifndef ARGS_ALLOW_OVERWRITING
         if (option->is_set) ARGS__FATAL("Option \"%s\" is already set: \"%s\"", option->long_name, cur.arg);

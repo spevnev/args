@@ -1,7 +1,8 @@
 #include <assert.h>
 #include "args.h"
 
-//< -v
+// Test that version is printed even if there are invalid/unknown options.
+//< --unknown -vabc --other=2
 //> current version: 1.2.3
 int main(int argc, char **argv) {
     Args a = {0};

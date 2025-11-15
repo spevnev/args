@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-### **BREAKING** Changes
+### **BREAKING** Changed
 
 - Completely change option functions: turn `short_name`, `is_optional`, and `default_value` into optional arguments
 - Change C++ option functions to return a builder
@@ -10,6 +10,10 @@
 - Rename `ARGS_MIN_DESC_LENGTH` to `ARGS_MIN_DESCRIPTION_LENGTH`
 - Rename `option_str` and `option_enum_str` to `option_string` and `option_enum_string`
 - Reorder `option_enum` arguments
+
+### **BREAKING** Deleted
+
+- Remove `ARGS_SKIP_UNKNOWN` due to ambiguity when parsing
 
 ### Added
 

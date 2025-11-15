@@ -1,7 +1,8 @@
 #include <assert.h>
 #include "args.h"
 
-//< -h
+// Test that help is called even if there are invalid/unknown options.
+//< --unknown -habc --other=2
 //> help message
 static void print_help(Args *args, const char *program_name) {
     (void) args;
