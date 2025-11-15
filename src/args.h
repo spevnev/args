@@ -132,6 +132,14 @@ struct Args {
 #define ARGS__WARN_UNUSED_RESULT
 #endif
 
+// clang-format off
+#ifdef __cplusplus
+#define ARGS__ZERO_INIT {}
+#else
+#define ARGS__ZERO_INIT {0}
+#endif
+// clang-format on
+
 #define ARGS__FATAL(...)              \
     do {                              \
         fprintf(stderr, "ERROR: ");   \
@@ -458,7 +466,7 @@ static void args__parsed_vec_push(Args__ParsedOptionVec *vec, Args__ParsedOption
     const size_t INITIAL_VECTOR_CAPACITY = 8;
     if (vec->length >= vec->capacity) {
         vec->capacity = vec->capacity == 0 ? INITIAL_VECTOR_CAPACITY : vec->capacity * 2;
-        vec->data = realloc(vec->data, vec->capacity * sizeof(*vec->data));
+        vec->data = (Args__ParsedOption *) realloc(vec->data, vec->capacity * sizeof(*vec->data));
         if (vec->data == NULL) ARGS__OUT_OF_MEMORY();
     }
     vec->data[vec->length++] = element;
@@ -964,7 +972,7 @@ static int parse_args(Args *a, int argc, char **argv, char ***positional_args) {
     }
 
     // Parse arguments without validation and errors.
-    Args__ParsedOptionVec parsed = {0};
+    Args__ParsedOptionVec parsed = ARGS__ZERO_INIT;
     while (argc > 0) {
         char *arg = *argv++;
         argc--;
@@ -984,15 +992,10 @@ static int parse_args(Args *a, int argc, char **argv, char ***positional_args) {
             const char *equals = strchr(arg, '=');
             if (equals != NULL) arg_length = equals - arg;
 
-            Args__ParsedOption cur = {
-                .is_short = false,
-                .as.long_ = {
-                    .start = arg,
-                    .length = arg_length,
-                },
-                .arg = full_arg,
-                .value = NULL,
-            };
+            Args__ParsedOption cur = ARGS__ZERO_INIT;
+            cur.as.long_.start = arg;
+            cur.as.long_.length = arg_length;
+            cur.arg = full_arg;
 
             if (equals != NULL) {
                 cur.value = equals + 1;
@@ -1012,12 +1015,10 @@ static int parse_args(Args *a, int argc, char **argv, char ***positional_args) {
                 char ch = *arg++;
                 arg_length--;
 
-                Args__ParsedOption cur = {
-                    .is_short = true,
-                    .as.short_name = ch,
-                    .arg = full_arg,
-                    .value = NULL,
-                };
+                Args__ParsedOption cur = ARGS__ZERO_INIT;
+                cur.is_short = true;
+                cur.as.short_name = ch;
+                cur.arg = full_arg;
 
                 Args__Option *option = args__find_option(a, cur);
                 if (option == NULL || option->type != ARGS__TYPE_BOOL) {
@@ -1305,153 +1306,346 @@ ARGS__MAYBE_UNUSED static void option_version(Args *a, const char *version_strin
 
 #else  // __cplusplus
 
+#include <functional>
+#include <memory>
+#include <optional>
+#include <string>
+#include <vector>
+
 class ArgsCpp {
+private:
+    class Buildable {
+    public:
+        virtual ~Buildable() {}
+
+    protected:
+        bool is_built{false};
+
+    private:
+        friend ArgsCpp;
+
+        virtual void build() = 0;
+    };
+
+    template <typename T, typename R>
+    class BaseOption : public Buildable {
+    public:
+        R &short_name(char short_name = '\0') {
+            m_short_name = short_name;
+            return static_cast<R &>(*this);
+        }
+
+        R &hidden(bool hidden = true) {
+            m_hidden = hidden;
+            return static_cast<R &>(*this);
+        }
+
+        const T &value() const {
+            ARGS__ASSERT(is_built);
+            return *m_value;
+        }
+
+        operator const T &() const { return value(); }
+
+    protected:
+        std::shared_ptr<Args> args;
+        const char *long_name;
+        const char *description;
+        char m_short_name{'\0'};
+        bool m_hidden{false};
+        const T *m_value{nullptr};
+
+    private:
+        friend ArgsCpp;
+        friend R;
+
+        BaseOption(const std::shared_ptr<Args> &args, const char *long_name, const char *description)
+            : args(args), long_name(long_name), description(description) {}
+    };
+
+    template <typename T, typename R>
+    class ValueOption : public BaseOption<T, R> {
+    public:
+        R &required(bool required = true) {
+            m_required = required;
+            return static_cast<R &>(*this);
+        }
+
+        R &default_value(T default_value) {
+            m_default_value = default_value;
+            return static_cast<R &>(*this);
+        }
+
+    protected:
+        bool m_required{false};
+        T m_default_value{};
+
+    private:
+        friend R;
+
+        ValueOption() = default;
+        using BaseOption<T, R>::BaseOption;
+    };
+
+    template <typename T, typename R>
+    class EnumOption : public ValueOption<T, R> {
+    protected:
+        const char **values{nullptr};
+
+    private:
+        friend R;
+        friend ArgsCpp;
+
+        EnumOption(
+            const std::shared_ptr<Args> &args,
+            const char *long_name,
+            const char *description,
+            const char **values
+        )
+            : ValueOption<T, R>(args, long_name, description), values(values) {}
+    };
+
+    using HelpCallback = std::function<void(ArgsCpp &, const char *s)>;
+
+    std::shared_ptr<Args> args;
+    std::vector<std::unique_ptr<Buildable> > options{};
+    HelpCallback help_callback{nullptr};
+
+    static ArgsCpp *instance;
+
+    static std::shared_ptr<Args> init_args() {
+        return std::shared_ptr<Args>(new Args{}, [](Args *a) {
+            free_args(a);
+            delete a;
+        });
+    }
+
+    static void callback_bridge(Args *c_args, const char *program_name) {
+        ARGS__ASSERT(instance != nullptr && instance->args.get() == c_args);
+        instance->help_callback(*instance, program_name);
+    }
+
 public:
-    ArgsCpp() : args() {}
-    ~ArgsCpp() { free_args(&args); }
+    class OptionLong : public ValueOption<long, OptionLong> {
+    private:
+        using ValueOption::ValueOption;
 
-    // Defines a long option, returned value is set by `parse_args`.
-    // Use '\0' for no short name.
-    // Exits if  `long_name` is nullptr, or out of memory.
-    ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT const long &option_long(
-        char short_name,
-        const char *long_name,
-        const char *description,
-        bool is_required = false,
-        long default_value = 0
-    ) {
-        Args__OptionLongArgs option_args{};
-        option_args.short_name = short_name;
-        option_args.required = is_required;
-        option_args.default_value = default_value;
-        return *args__option_long(option_args, &args, long_name, description);
+        void build() override {
+            Args__OptionLongArgs option_args;
+            option_args.short_name = m_short_name;
+            option_args.required = m_required;
+            option_args.hidden = m_hidden;
+            option_args.default_value = m_default_value;
+            m_value = args__option_long(option_args, args.get(), long_name, description);
+        }
+    };
+
+    class OptionFloat : public ValueOption<float, OptionFloat> {
+    private:
+        using ValueOption::ValueOption;
+
+        void build() override {
+            Args__OptionFloatArgs option_args;
+            option_args.short_name = m_short_name;
+            option_args.required = m_required;
+            option_args.hidden = m_hidden;
+            option_args.default_value = m_default_value;
+            m_value = args__option_float(option_args, args.get(), long_name, description);
+        }
+    };
+
+    class OptionString : public ValueOption<const char *, OptionString> {
+    private:
+        friend ArgsCpp;
+
+        Args__Type type;
+
+        OptionString(const std::shared_ptr<Args> &args, const char *long_name, const char *description, Args__Type type)
+            : ValueOption(args, long_name, description), type(type) {}
+
+        void build() override {
+            Args__OptionStringArgs option_args;
+            option_args.short_name = m_short_name;
+            option_args.required = m_required;
+            option_args.hidden = m_hidden;
+            option_args.default_value = m_default_value;
+            m_value = args__option_string(option_args, type, args.get(), long_name, description);
+        }
+    };
+
+    class OptionFlag : public BaseOption<bool, OptionFlag> {
+    public:
+        OptionFlag &ignore_required(bool ignore_required = true) {
+            m_ignore_required = ignore_required;
+            return *this;
+        }
+
+    private:
+        bool m_ignore_required{false};
+
+        using BaseOption::BaseOption;
+
+        void build() override {
+            Args__OptionFlagArgs option_args;
+            option_args.short_name = m_short_name;
+            option_args.ignore_required = m_ignore_required;
+            option_args.hidden = m_hidden;
+            m_value = args__option_flag(option_args, args.get(), long_name, description);
+        }
+    };
+
+    class OptionEnum : public EnumOption<size_t, OptionEnum> {
+    private:
+        using EnumOption::EnumOption;
+
+        void build() override {
+            Args__OptionEnumArgs option_args;
+            option_args.short_name = m_short_name;
+            option_args.required = m_required;
+            option_args.hidden = m_hidden;
+            option_args.default_value = m_default_value;
+            m_value = args__option_enum(option_args, args.get(), long_name, description, values);
+        }
+    };
+
+    class OptionEnumString : public EnumOption<const char *, OptionEnumString> {
+    private:
+        using EnumOption::EnumOption;
+
+        void build() override {
+            Args__OptionEnumStringArgs option_args;
+            option_args.short_name = m_short_name;
+            option_args.required = m_required;
+            option_args.hidden = m_hidden;
+            option_args.default_value = m_default_value;
+            m_value = args__option_enum_string(option_args, args.get(), long_name, description, values);
+        }
+    };
+
+    ArgsCpp() : args(init_args()) { instance = this; }
+
+    ArgsCpp(const ArgsCpp &) = delete;
+    ArgsCpp &operator=(const ArgsCpp &) = delete;
+    ArgsCpp(ArgsCpp &&) = default;
+    ArgsCpp &operator=(ArgsCpp &&) = default;
+
+    // See `::option_help`.
+    void option_help(HelpCallback help_callback) {
+        this->help_callback = help_callback;
+        ::option_help(args.get(), callback_bridge);
     }
 
-    // Defines a float option, returned value is set by `parse_args`.
-    // Use '\0' for no short name.
-    // Exits if  `long_name` is nullptr, or out of memory.
-    ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT const float &option_float(
-        char short_name,
-        const char *long_name,
-        const char *description,
-        bool is_required = false,
-        float default_value = 0.0F
-    ) {
-        Args__OptionFloatArgs option_args{};
-        option_args.short_name = short_name;
-        option_args.required = is_required;
-        option_args.default_value = default_value;
-        return *args__option_float(option_args, &args, long_name, description);
+    // See `::option_version`.
+    void option_version(const char *version_string) { ::option_version(args.get(), version_string); }
+
+    // Returns a reference to a long option.
+    // Provides builder-style API for additional configuration.
+    // The option is built and its value is set by `parse_args`.
+    // Value is accessed through implicit conversion or `.value()`.
+    // `long_name` must not be nullptr.
+    ARGS__WARN_UNUSED_RESULT OptionLong &option_long(const char *long_name, const char *description) {
+        auto *option = new OptionLong(args, long_name, description);
+        options.emplace_back(option);
+        return *option;
     }
 
-    // Defines a string option, returned value is set by `parse_args`.
-    // String memory is owned by library, freed in destructor.
-    // Result can be nullptr only if default value is nullptr.
-    // Use '\0' for no short name.
-    // Exits if `long_name` is nullptr, or out of memory.
-    ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT const char *&option_string(
-        char short_name,
-        const char *long_name,
-        const char *description,
-        bool is_required = false,
-        const char *default_value = nullptr
-    ) {
-        Args__OptionStringArgs option_args{};
-        option_args.short_name = short_name;
-        option_args.required = is_required;
-        option_args.default_value = default_value;
-        return *args__option_string(option_args, ARGS__TYPE_STRING, &args, long_name, description);
+    // Returns a reference to a float option.
+    // Provides builder-style API for additional configuration.
+    // The option is built and its value is set by `parse_args`.
+    // Value is accessed through implicit conversion or `.value()`.
+    // `long_name` must not be nullptr.
+    ARGS__WARN_UNUSED_RESULT OptionFloat &option_float(const char *long_name, const char *description) {
+        auto *option = new OptionFloat(args, long_name, description);
+        options.emplace_back(option);
+        return *option;
+    }
+
+    // Returns a reference to a string option.
+    // Provides builder-style API for additional configuration.
+    // The option is built and its value is set by `parse_args`.
+    // Value is accessed through implicit conversion or `.value()`.
+    // Value can be nullptr only if default is nullptr.
+    // `long_name` must not be nullptr.
+    ARGS__WARN_UNUSED_RESULT OptionString &option_string(const char *long_name, const char *description) {
+        auto *option = new OptionString(args, long_name, description, ARGS__TYPE_STRING);
+        options.emplace_back(option);
+        return *option;
     }
 
     // Same as `option_string` except that shell completion will suggest paths.
     // Does NOT check that the value is a path.
-    ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT const char *&option_path(
-        char short_name,
-        const char *long_name,
-        const char *description,
-        bool is_required = false,
-        const char *default_value = nullptr
-    ) {
-        Args__OptionStringArgs option_args{};
-        option_args.short_name = short_name;
-        option_args.required = is_required;
-        option_args.default_value = default_value;
-        return *args__option_string(option_args, ARGS__TYPE_PATH, &args, long_name, description);
+    ARGS__WARN_UNUSED_RESULT OptionString &option_path(const char *long_name, const char *description) {
+        auto *option = new OptionString(args, long_name, description, ARGS__TYPE_PATH);
+        options.emplace_back(option);
+        return *option;
     }
 
-    // Defines a boolean flag, returned value is set by `parse_args`.
-    // Use '\0' for no short name.
-    // Exits if `long_name` is nullptr, or out of memory.
-    ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT const bool &option_flag(
-        char short_name,
-        const char *long_name,
-        const char *description,
-        bool ignore_required = false
-    ) {
-        Args__OptionFlagArgs option_args{};
-        option_args.short_name = short_name;
-        option_args.ignore_required = ignore_required;
-        return *args__option_flag(option_args, &args, long_name, description);
+    // Returns a reference to a flag option.
+    // Provides builder-style API for additional configuration.
+    // The option is built and its value is set by `parse_args`.
+    // Value is accessed through implicit conversion or `.value()`.
+    // `long_name` must not be nullptr.
+    ARGS__WARN_UNUSED_RESULT OptionFlag &option_flag(const char *long_name, const char *description) {
+        auto *option = new OptionFlag(args, long_name, description);
+        options.emplace_back(option);
+        return *option;
     }
 
-    // Defines an enum option, returned value is set by `parse_args`.
-    // Result is either a valid index or a default value.
+    // Returns a reference to an index enum option.
+    // Provides builder-style API for additional configuration.
+    // The option is built and its value is set by `parse_args`.
+    // Value is accessed through implicit conversion or `.value()`.
+    // Value is either a valid index or a default value.
     // `values` must be a nullptr-terminated array, matched case-insensitively.
-    // Use '\0' for no short name.
-    // Exits if `long_name` or `values` is nullptr, or out of memory.
-    ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT const size_t &option_enum(
-        char short_name,
+    // `long_name` and `values` must not be nullptr.
+    ARGS__WARN_UNUSED_RESULT OptionEnum &option_enum(
         const char *long_name,
         const char *description,
-        const char **values,
-        bool is_required = false,
-        size_t default_value = 0
+        const char **values
     ) {
-        Args__OptionEnumArgs option_args{};
-        option_args.short_name = short_name;
-        option_args.required = is_required;
-        option_args.default_value = default_value;
-        return *args__option_enum(option_args, &args, long_name, description, values);
+        auto *option = new OptionEnum(args, long_name, description, values);
+        options.emplace_back(option);
+        return *option;
     }
 
-    // Defines an enum option, returned value is set by `parse_args`.
-    // Result is either a string from `values` or a default value.
-    // String and array memory is owned by library, freed in destructor.
+    // Returns a reference to a string enum option.
+    // Provides builder-style API for additional configuration.
+    // The option is built and its value is set by `parse_args`.
+    // Value is accessed through implicit conversion or `.value()`.
+    // Value can be nullptr only if default is nullptr.
     // `values` must be a nullptr-terminated array, matched case-insensitively.
-    // Use '\0' for no short name.
-    // Exits if `long_name` or `values` is nullptr, or out of memory.
-    ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT const char *&option_enum_string(
-        char short_name,
+    // `long_name` and `values` must not be nullptr.
+    ARGS__WARN_UNUSED_RESULT OptionEnumString &option_enum_string(
         const char *long_name,
         const char *description,
-        const char **values,
-        bool is_required = false,
-        const char *default_value = nullptr
+        const char **values
     ) {
-        Args__OptionEnumStringArgs option_args{};
-        option_args.short_name = short_name;
-        option_args.required = is_required;
-        option_args.default_value = default_value;
-        return *args__option_enum_string(option_args, &args, long_name, description, values);
+        auto *option = new OptionEnumString(args, long_name, description, values);
+        options.emplace_back(option);
+        return *option;
     }
 
-    // See `::parse_args()`
+    // See `::parse_args`.
     int parse_args(int argc, char **argv, char **&positional_args) {
-        return ::parse_args(&args, argc, argv, &positional_args);
+        for (const auto &option : options) {
+            option->build();
+            option->is_built = true;
+        }
+        return ::parse_args(args.get(), argc, argv, &positional_args);
     }
 
-    // See `::print_options()`
-    ARGS__MAYBE_UNUSED void print_options(FILE *fp = stdout) { ::print_options(&args, fp); }
-
-private:
-    Args args;
+    // See `::print_options`.
+    void print_options(FILE *fp = stdout) { ::print_options(args.get(), fp); }
 };
+
+ArgsCpp *ArgsCpp::instance = nullptr;
 
 #endif  // __cplusplus
 
 #undef ARGS__HAS_ATTRIBUTE
 #undef ARGS__MAYBE_UNUSED
 #undef ARGS__WARN_UNUSED_RESULT
+#undef ARGS__ZERO_INIT
 #undef ARGS__FATAL
 #undef ARGS__OUT_OF_MEMORY
 #undef ARGS__UNREACHABLE

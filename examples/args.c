@@ -29,7 +29,6 @@ int main(int argc, char **argv) {
     // Named arguments are set through designated initializer: `.name1 = value1, .name2 = value2`,
     // with default value 0 / '\0' / false / NULL depending on the type.
     // Named arguments: short_name, required, hidden, default_value.
-    const bool *hidden = option_flag(&a, "hidden", NULL, .hidden = true);
     const long *long_ = option_long(&a, "long", "A long option", .default_value = 5, .short_name = 'l');
     const float *float_ = option_float(&a, "float", "A float option", .short_name = 'f', .required = true);
     const char **string = option_string(
@@ -40,6 +39,7 @@ int main(int argc, char **argv) {
         .default_value = "string default"
     );
     const char **path = option_path(&a, "path", "A path option");
+    const bool *hidden = option_flag(&a, "hidden", NULL, .hidden = true);
 
     // If enum is continuous and array matches it, result of `option_enum` can be converted directly.
     typedef enum { FIRST, SECOND, THIRD } Enum;
@@ -58,8 +58,8 @@ int main(int argc, char **argv) {
 
     // Parse arguments. Sets option values and returns positional arguments.
     // Handles shell completion by printing to stdout and exiting.
-    // Exits on errors: wrong option value, missing required option, unknown option, etc.
-    // Must be called before side effects and printing to stdout.
+    // Exits on error: invalid option value, missing required option, unknown option, etc.
+    // Must be called before side effects or stdout output.
     char **pos_args;
     int pos_args_len = parse_args(&a, argc, argv, &pos_args);
 
@@ -79,18 +79,18 @@ int main(int argc, char **argv) {
 
     // Use option values.
     printf(
-        "options: h=%s l=%ld f=%f s=\"%s\" p=\"%s\" e=%d E=\"%s\"\n",
-        *hidden ? "true" : "false",
+        "options: l=%ld f=%f s=\"%s\" p=\"%s\" h=%s e=%d E=\"%s\"\n",
         *long_,
         *float_,
         *string,
         *path,
+        *hidden ? "true" : "false",
         *enum_,
         *enum_string
     );
 
     // Handle positional arguments.
-    printf("positional arguments:");
+    printf("Positional arguments:");
     for (int i = 0; i < pos_args_len; i++) printf(" %s", pos_args[i]);
     printf("\n");
 

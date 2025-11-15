@@ -8,7 +8,7 @@ ifndef NO_FSANITIZE
 	COMMON_FLAGS += -g3 -fsanitize=address,leak,undefined
 endif
 
-CFLAGS       := $(COMMON_FLAGS) -std=c99
+CFLAGS       := $(COMMON_FLAGS) -std=c99 -Wstrict-prototypes
 CXXFLAGS     := $(COMMON_FLAGS) -std=c++11
 
 C_EXAMPLES   := $(patsubst %.c, $(OUT_DIR)/%, $(wildcard $(EXAMPLE_DIR)/*.c))

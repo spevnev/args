@@ -3,7 +3,11 @@
 
 //< -h
 //> help message
-static void print_help() { printf("help message\n"); }
+static void print_help(Args *args, const char *program_name) {
+    (void) args;
+    (void) program_name;
+    printf("help message\n");
+}
 
 int main(int argc, char **argv) {
     Args a = {0};

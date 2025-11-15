@@ -4,6 +4,8 @@
 
 //< -l 1 pos --enum-str=third -b --float=2.3 args -p path --str string -e SECOND
 //> Options:
+//>   -h, --help      Show help
+//>   -v, --version   Print version
 //>   -l, --long
 //>   -f, --float
 //>   -s, --str
@@ -15,13 +17,15 @@ int main(int argc, char **argv) {
     const char *ENUM_VALUES[] = {"first", "second", "third", nullptr};
 
     ArgsCpp args;
-    const auto &l = args.option_long('l', "long", nullptr, true);
-    const auto &f = args.option_float('f', "float", nullptr, true);
-    const auto &s = args.option_string('s', "str", nullptr, true);
-    const auto &p = args.option_path('p', "path", nullptr, true);
-    const auto &b = args.option_flag('b', "bool", nullptr);
-    const auto &ei = args.option_enum('e', "enum", nullptr, ENUM_VALUES, true);
-    const auto &es = args.option_enum_string('E', "enum-str", nullptr, ENUM_VALUES, true);
+    args.option_help([](ArgsCpp &, const char *) { printf("help message\n"); });
+    args.option_version("current version: 1.2.3");
+    const auto &l = args.option_long("long", nullptr).short_name('l').required();
+    const auto &f = args.option_float("float", nullptr).short_name('f').required();
+    const auto &s = args.option_string("str", nullptr).short_name('s').required();
+    const auto &p = args.option_path("path", nullptr).short_name('p').required();
+    const auto &b = args.option_flag("bool", nullptr).short_name('b');
+    const auto &ei = args.option_enum("enum", nullptr, ENUM_VALUES).short_name('e').required();
+    const auto &es = args.option_enum_string("enum-str", nullptr, ENUM_VALUES).short_name('E').required();
 
     char **pos_args;
     int pos_args_len = args.parse_args(argc, argv, pos_args);
