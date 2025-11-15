@@ -50,7 +50,13 @@ int main(int argc, char **argv) {
         .default_value = "string default"
     );
     const char **path = option_path(&a, "path", "A path option");
-    const bool *hidden = option_flag(&a, "hidden", NULL, .hidden = true);
+
+    // Declare a hidden command-like option, e.g. for dumping system info for bug report.
+    // Option with `early_exit` causes `parse_args` to exit early if the option is found,
+    // skips parsing and validation of other options, their values remain default.
+    // Should be handled right after `parse_args`.
+    // Can also be used for handling help and version.
+    const bool *dump = option_flag(&a, "dump", NULL, .hidden = true, .early_exit = true);
 
     // If enum is continuous and array matches it, result of `option_enum` can be converted directly.
     typedef enum { FIRST, SECOND, THIRD } Enum;
@@ -74,6 +80,12 @@ int main(int argc, char **argv) {
     char **pos_args;
     int pos_args_len = parse_args(&a, argc, argv, &pos_args);
 
+    if (*dump) {
+        printf("--dump is set.\n");
+        free_args(&a);
+        return EXIT_SUCCESS;
+    }
+
     // Print help on subcommand.
     if (pos_args_len == 1 && strcmp(pos_args[0], "help") == 0) {
         print_help(&a, argv[0]);
@@ -90,12 +102,11 @@ int main(int argc, char **argv) {
 
     // Use option values.
     printf(
-        "options: l=%ld f=%f s=\"%s\" p=\"%s\" h=%s e=%d E=\"%s\"\n",
+        "options: l=%ld f=%f s=\"%s\" p=\"%s\" e=%d E=\"%s\"\n",
         *long_,
         *float_,
         *string,
         *path,
-        *hidden ? "true" : "false",
         *enum_,
         *enum_string
     );
@@ -151,7 +162,13 @@ int main(int argc, char **argv) {
     const auto &float_ = args.option_float("float", "A float option").short_name('f').required();
     const auto &string = args.option_string("str", "A string option").short_name('s').default_value("string default");
     const auto &path = args.option_path("path", "A path option").short_name('p');
-    const auto &hidden = args.option_flag("hidden", nullptr).hidden();
+
+    // Declare a hidden command-like option, e.g. for dumping system info for bug report.
+    // Option with `early_exit` causes `parse_args` to exit early if the option is found,
+    // skips parsing and validation of other options, their values remain default.
+    // Should be handled right after `parse_args`.
+    // Can also be used for handling help and version.
+    const auto &dump = args.option_flag("dump", NULL).hidden().early_exit();
 
     const char *enum_values[] = {"first", "sed", "third", nullptr};
     const auto &e = args.option_enum("enum", "An enum option", enum_values).short_name('e').default_value(0);
@@ -163,6 +180,11 @@ int main(int argc, char **argv) {
     // Must be called before side effects or stdout output.
     char **pos_args;
     int pos_args_len = args.parse_args(argc, argv, pos_args);
+
+    if (dump) {
+        printf("--dump is set.\n");
+        return EXIT_SUCCESS;
+    }
 
     // Print help on subcommand.
     if (pos_args_len == 1 && strcmp(pos_args[0], "help") == 0) {
@@ -178,12 +200,11 @@ int main(int argc, char **argv) {
 
     // Values can be accessed using implicit conversion or `.value()`.
     printf(
-        "options: l=%ld f=%f s=\"%s\" p=\"%s\" h=%s e=%ld E=\"%s\"\n",
+        "options: l=%ld f=%f s=\"%s\" p=\"%s\" e=%ld E=\"%s\"\n",
         long_.value(),
         float_.value(),
         string.value(),
         path.value(),
-        hidden ? "true" : "false",
         e.value(),
         es.value()
     );

@@ -10,6 +10,7 @@
 - Rename `ARGS_MIN_DESC_LENGTH` to `ARGS_MIN_DESCRIPTION_LENGTH`
 - Rename `option_str` and `option_enum_str` to `option_string` and `option_enum_string`
 - Reorder `option_enum` arguments
+- Change `ignore_required` to `early_exit`
 
 ### **BREAKING** Deleted
 

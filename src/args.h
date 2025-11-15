@@ -84,7 +84,7 @@ typedef struct Args__Option {
         char *string;
         struct {
             bool value;
-            bool ignore_required;
+            bool early_exit;
             bool is_help;
             bool is_version;
         } bool_;
@@ -96,7 +96,7 @@ typedef struct Args__Option {
                 const char *value;
             } as;
         } enum_;
-    } value;
+    } as;
 } Args__Option;
 
 typedef struct Args Args;
@@ -185,11 +185,11 @@ static void args__set_enum_values(Args__Option *option, const char **values) {
 
     size_t length = 0;
     while (values[length] != NULL) length++;
-    option->value.enum_.length = length;
+    option->as.enum_.length = length;
 
     char **copy = (char **) malloc(sizeof(*copy) * length);
     if (copy == NULL) ARGS__OUT_OF_MEMORY();
-    option->value.enum_.values = copy;
+    option->as.enum_.values = copy;
 
     for (size_t i = 0; i < length; i++) {
         for (const char *c = values[i]; *c != '\0'; c++) {
@@ -285,15 +285,18 @@ static Args__Option *args__new_option(
             ARGS__DROP_TWO(__VA_ARGS__, }, )
 // clang-format on
 
-#define ARGS__OPTION_ARGS_STRUCT(default_value_t) \
-    struct {                                      \
-        char short_name;                          \
-        bool required;                            \
-        bool hidden;                              \
-        default_value_t default_value;            \
+#define ARGS__OPTION_COMMON_FIELDS \
+    char short_name;               \
+    bool hidden;
+
+#define ARGS__OPTION_VALUE_STRUCT(default_value_t) \
+    struct {                                       \
+        ARGS__OPTION_COMMON_FIELDS                 \
+        bool required;                             \
+        default_value_t default_value;             \
     }
 
-typedef ARGS__OPTION_ARGS_STRUCT(long) Args__OptionLongArgs;
+typedef ARGS__OPTION_VALUE_STRUCT(long) Args__OptionLongArgs;
 
 ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const long *args__option_long(
     Args__OptionLongArgs args,
@@ -311,11 +314,11 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const long *args__option_long
         args.hidden,
         ARGS__TYPE_LONG
     );
-    option->default_value.long_ = option->value.long_ = args.default_value;
-    return &option->value.long_;
+    option->default_value.long_ = option->as.long_ = args.default_value;
+    return &option->as.long_;
 }
 
-typedef ARGS__OPTION_ARGS_STRUCT(float) Args__OptionFloatArgs;
+typedef ARGS__OPTION_VALUE_STRUCT(float) Args__OptionFloatArgs;
 
 ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const float *args__option_float(
     Args__OptionFloatArgs args,
@@ -333,11 +336,11 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const float *args__option_flo
         args.hidden,
         ARGS__TYPE_FLOAT
     );
-    option->default_value.float_ = option->value.float_ = args.default_value;
-    return &option->value.float_;
+    option->default_value.float_ = option->as.float_ = args.default_value;
+    return &option->as.float_;
 }
 
-typedef ARGS__OPTION_ARGS_STRUCT(const char *) Args__OptionStringArgs;
+typedef ARGS__OPTION_VALUE_STRUCT(const char *) Args__OptionStringArgs;
 
 ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const char **args__option_string(
     Args__OptionStringArgs args,
@@ -358,15 +361,18 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const char **args__option_str
     );
     if (args.default_value != NULL) {
         option->default_value.string = args__strdup(args.default_value);
-        option->value.string = args__strdup(args.default_value);
+        option->as.string = args__strdup(args.default_value);
     }
-    return (const char **) &option->value.string;
+    return (const char **) &option->as.string;
 }
 
 typedef struct {
-    char short_name;
-    bool ignore_required;
-    bool hidden;
+    ARGS__OPTION_COMMON_FIELDS
+    // If set, parse_args will exit as soon as this option is found.
+    // Skips parsing and validation of other options, their values stay default.
+    // Must be handled right after `parse_args`, before using other options.
+    // Used for handling command-like options, e.g. help, version.
+    bool early_exit;
 } Args__OptionFlagArgs;
 
 ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const bool *args__option_flag(
@@ -385,11 +391,11 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const bool *args__option_flag
         args.hidden,
         ARGS__TYPE_BOOL
     );
-    option->value.bool_.ignore_required = args.ignore_required;
-    return &option->value.bool_.value;
+    option->as.bool_.early_exit = args.early_exit;
+    return &option->as.bool_.value;
 }
 
-typedef ARGS__OPTION_ARGS_STRUCT(size_t) Args__OptionEnumArgs;
+typedef ARGS__OPTION_VALUE_STRUCT(size_t) Args__OptionEnumArgs;
 
 ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const size_t *args__option_enum(
     Args__OptionEnumArgs args,
@@ -409,14 +415,14 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const size_t *args__option_en
         ARGS__TYPE_ENUM_INDEX
     );
     args__set_enum_values(option, values);
-    option->value.enum_.as.index = args.default_value;
-    if (args.default_value < option->value.enum_.length) {
+    option->as.enum_.as.index = args.default_value;
+    if (args.default_value < option->as.enum_.length) {
         option->default_value.enum_ = args__strdup(values[args.default_value]);
     }
-    return &option->value.enum_.as.index;
+    return &option->as.enum_.as.index;
 }
 
-typedef ARGS__OPTION_ARGS_STRUCT(const char *) Args__OptionEnumStringArgs;
+typedef ARGS__OPTION_VALUE_STRUCT(const char *) Args__OptionEnumStringArgs;
 
 ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const char **args__option_enum_string(
     Args__OptionEnumStringArgs args,
@@ -437,8 +443,8 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const char **args__option_enu
     );
     if (args.default_value != NULL) option->default_value.enum_ = args__strdup(args.default_value);
     args__set_enum_values(option, values);
-    option->value.enum_.as.value = option->default_value.enum_;
-    return &option->value.enum_.as.value;
+    option->as.enum_.as.value = option->default_value.enum_;
+    return &option->as.enum_.as.value;
 }
 
 typedef struct {
@@ -489,29 +495,29 @@ static void args__parse_value(Args__Option *option, const char *value) {
     switch (option->type) {
         case ARGS__TYPE_LONG: {
             char *end = NULL;
-            option->value.long_ = strtol(value, &end, 0);
+            option->as.long_ = strtol(value, &end, 0);
             if (end == NULL || *end != '\0') ARGS__FATAL("Invalid integer \"%s\"", value);
         } break;
         case ARGS__TYPE_FLOAT: {
             char *end = NULL;
-            option->value.float_ = strtof(value, &end);
+            option->as.float_ = strtof(value, &end);
             if (end == NULL || *end != '\0') ARGS__FATAL("Invalid float \"%s\"", value);
         } break;
         case ARGS__TYPE_STRING:
         case ARGS__TYPE_PATH:
-            free(option->value.string);
-            option->value.string = args__strdup(value);
+            free(option->as.string);
+            option->as.string = args__strdup(value);
             break;
         case ARGS__TYPE_BOOL: ARGS__UNREACHABLE(); break;
         case ARGS__TYPE_ENUM_INDEX:
         case ARGS__TYPE_ENUM_STRING:
-            for (size_t i = 0; i < option->value.enum_.length; i++) {
-                if (strcasecmp(option->value.enum_.values[i], value) != 0) continue;
+            for (size_t i = 0; i < option->as.enum_.length; i++) {
+                if (strcasecmp(option->as.enum_.values[i], value) != 0) continue;
 
                 if (option->type == ARGS__TYPE_ENUM_INDEX) {
-                    option->value.enum_.as.index = i;
+                    option->as.enum_.as.index = i;
                 } else {
-                    option->value.enum_.as.value = option->value.enum_.values[i];
+                    option->as.enum_.as.value = option->as.enum_.values[i];
                 }
                 return;
             }
@@ -777,8 +783,8 @@ static void args__bash_complete(Args *a, const char *prev, const char *cur, cons
             case ARGS__TYPE_PATH:   break;
             case ARGS__TYPE_ENUM_INDEX:
             case ARGS__TYPE_ENUM_STRING:
-                for (size_t i = 0; i < option->value.enum_.length; i++) {
-                    const char *value = option->value.enum_.values[i];
+                for (size_t i = 0; i < option->as.enum_.length; i++) {
+                    const char *value = option->as.enum_.values[i];
                     if (strlen(value) >= cur_length && strncasecmp(value, cur, cur_length) == 0) {
                         printf("%s\n", value);
                     }
@@ -802,9 +808,9 @@ static void args__zsh_print_option_details(Args__Option *option) {
         case ARGS__TYPE_ENUM_INDEX:
         case ARGS__TYPE_ENUM_STRING:
             printf(":%s:(", option->long_name);
-            for (size_t i = 0; i < option->value.enum_.length; i++) {
+            for (size_t i = 0; i < option->as.enum_.length; i++) {
                 if (i > 0) printf(" ");
-                args__completion_print_escaped(option->value.enum_.values[i], " :()");
+                args__completion_print_escaped(option->as.enum_.values[i], " :()");
             }
             printf(")");
             break;
@@ -836,9 +842,9 @@ static void args__fish_complete(Args *a) {
         printf("-l %s -%c", i->long_name, i->type == ARGS__TYPE_PATH ? 'F' : 'f');
         if (i->type == ARGS__TYPE_ENUM_INDEX || i->type == ARGS__TYPE_ENUM_STRING) {
             printf(" -a '");
-            for (size_t j = 0; j < i->value.enum_.length; j++) {
+            for (size_t j = 0; j < i->as.enum_.length; j++) {
                 if (j > 0) printf(" ");
-                args__completion_print_escaped(i->value.enum_.values[j], " \"$()");
+                args__completion_print_escaped(i->as.enum_.values[j], " \"$()");
             }
             printf("'");
         }
@@ -892,13 +898,13 @@ static void free_args(Args *a) {
             case ARGS__TYPE_STRING:
             case ARGS__TYPE_PATH:
                 free(cur->default_value.string);
-                free(cur->value.string);
+                free(cur->as.string);
                 break;
             case ARGS__TYPE_ENUM_STRING:
             case ARGS__TYPE_ENUM_INDEX:
                 free(cur->default_value.enum_);
-                for (size_t i = 0; i < cur->value.enum_.length; i++) free(cur->value.enum_.values[i]);
-                free(cur->value.enum_.values);
+                for (size_t i = 0; i < cur->as.enum_.length; i++) free(cur->as.enum_.values[i]);
+                free(cur->as.enum_.values);
                 break;
         }
         free(cur->long_name);
@@ -1036,29 +1042,34 @@ static int parse_args(Args *a, int argc, char **argv, char ***positional_args) {
         }
     }
 
-    // Check help and version.
+    // Check help, version, and early_exit.
     for (size_t i = 0; i < parsed.length; i++) {
         Args__Option *option = args__find_option(a, parsed.data[i]);
         if (option == NULL) continue;
         if (option->type != ARGS__TYPE_BOOL) continue;
 
-        if (option->value.bool_.is_help) {
+        if (option->as.bool_.is_help) {
             ARGS__ASSERT(a->help_callback != NULL);
             a->help_callback(a, program_name);
             free_args(a);
             exit(EXIT_SUCCESS);
         }
 
-        if (option->value.bool_.is_version) {
+        if (option->as.bool_.is_version) {
             ARGS__ASSERT(a->version_string != NULL);
             printf("%s\n", a->version_string);
             free_args(a);
             exit(EXIT_SUCCESS);
         }
+
+        if (option->as.bool_.early_exit) {
+            option->as.bool_.value = true;
+            free(parsed.data);
+            return positional_args_index;
+        }
     }
 
-    // Validate parsed, set their values.
-    bool ignore_required = false;
+    // Validate parsed and set their values.
     for (size_t i = 0; i < parsed.length; i++) {
         Args__ParsedOption cur = parsed.data[i];
         Args__Option *option = args__find_option(a, cur);
@@ -1078,8 +1089,7 @@ static int parse_args(Args *a, int argc, char **argv, char ***positional_args) {
 
         if (option->type == ARGS__TYPE_BOOL) {
             if (cur.value != NULL) ARGS__FATAL("Flags cannot have a value: \"%s\"", cur.arg);
-            option->value.bool_.value = true;
-            if (option->value.bool_.ignore_required) ignore_required = true;
+            option->as.bool_.value = true;
         } else {
             if (cur.value == NULL) ARGS__FATAL("Option \"%s\" is missing a value", cur.arg);
             args__parse_value(option, cur.value);
@@ -1087,11 +1097,9 @@ static int parse_args(Args *a, int argc, char **argv, char ***positional_args) {
     }
 
     // Check required.
-    if (!ignore_required) {
-        for (Args__Option *option = a->head; option != NULL; option = option->next) {
-            if (option->is_required && !option->is_set) {
-                ARGS__FATAL("Missing a required option \"%s\"", option->long_name);
-            }
+    for (Args__Option *option = a->head; option != NULL; option = option->next) {
+        if (option->is_required && !option->is_set) {
+            ARGS__FATAL("Missing a required option \"%s\"", option->long_name);
         }
     }
 
@@ -1205,7 +1213,7 @@ ARGS__MAYBE_UNUSED static void option_help(Args *a, Args__HelpCallback help_call
     a->help_callback = help_callback;
 
     Args__Option *option = args__new_option(a, "help", "Show help", 'h', false, false, ARGS__TYPE_BOOL);
-    option->value.bool_.is_help = true;
+    option->as.bool_.is_help = true;
 }
 
 // Defines a version option.
@@ -1218,7 +1226,7 @@ ARGS__MAYBE_UNUSED static void option_version(Args *a, const char *version_strin
     a->version_string = args__strdup(version_string);
 
     Args__Option *option = args__new_option(a, "version", "Print version", 'v', false, false, ARGS__TYPE_BOOL);
-    option->value.bool_.is_version = true;
+    option->as.bool_.is_version = true;
 }
 
 #ifndef __cplusplus
@@ -1471,20 +1479,20 @@ public:
 
     class OptionFlag : public BaseOption<bool, OptionFlag> {
     public:
-        OptionFlag &ignore_required(bool ignore_required = true) {
-            m_ignore_required = ignore_required;
+        OptionFlag &early_exit(bool early_exit = true) {
+            m_early_exit = early_exit;
             return *this;
         }
 
     private:
-        bool m_ignore_required{false};
+        bool m_early_exit{false};
 
         using BaseOption::BaseOption;
 
         void build() override {
             Args__OptionFlagArgs option_args;
             option_args.short_name = m_short_name;
-            option_args.ignore_required = m_ignore_required;
+            option_args.early_exit = m_early_exit;
             option_args.hidden = m_hidden;
             m_value = args__option_flag(option_args, args.get(), long_name, description);
         }
@@ -1646,4 +1654,5 @@ ArgsCpp *ArgsCpp::instance = nullptr;
 #undef ARGS__OUT_OF_MEMORY
 #undef ARGS__UNREACHABLE
 #undef ARGS__ASSERT
-#undef ARGS__OPTION_ARGS_STRUCT
+#undef ARGS__OPTION_COMMON_FIELDS
+#undef ARGS__OPTION_VALUE_STRUCT
