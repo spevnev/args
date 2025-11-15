@@ -1320,7 +1320,7 @@ class ArgsCpp {
 private:
     class Buildable {
     public:
-        virtual ~Buildable() {}
+        virtual ~Buildable() = default;
 
     protected:
         bool is_built{false};
@@ -1334,6 +1334,12 @@ private:
     template <typename T, typename R>
     class BaseOption : public Buildable {
     public:
+        // Delete constructors to force user to keep a reference.
+        BaseOption(const BaseOption &) = delete;
+        BaseOption &operator=(const BaseOption &) = delete;
+        BaseOption(BaseOption &&) = delete;
+        BaseOption &operator=(BaseOption &&) = delete;
+
         R &short_name(char short_name = '\0') {
             m_short_name = short_name;
             return static_cast<R &>(*this);
@@ -1345,7 +1351,7 @@ private:
         }
 
         const T &value() const {
-            ARGS__ASSERT(is_built);
+            if (!is_built) ARGS__FATAL("Option values cannot be accessed before `parse_args()`");
             return *m_value;
         }
 
@@ -1528,6 +1534,8 @@ public:
 
     ArgsCpp() : args(init_args()) { instance = this; }
 
+    // Explicitly delete copy constructor to improve error in case when ArgsCpp
+    // is passed by value instead of by reference (e.g. help callback).
     ArgsCpp(const ArgsCpp &) = delete;
     ArgsCpp &operator=(const ArgsCpp &) = delete;
     ArgsCpp(ArgsCpp &&) = default;
