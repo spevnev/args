@@ -700,7 +700,7 @@ static void args__bash_complete(Args *a, const char *prev, const char *cur, cons
                 }
 
                 length += 2;
-                if (print_short) length += 2;
+                if (print_long) length += 2;
             }
 
             int padding = 0;
@@ -714,12 +714,12 @@ static void args__bash_complete(Args *a, const char *prev, const char *cur, cons
             // When there is only one completion, bash will immediately append it to
             // the current command, don't print description or it will be used too.
             if (matches > 1) {
-                if (padding > 0) {
-                    printf("%*c", padding, ' ');
-                    length += padding;
-                }
-
                 if (i->description != NULL) {
+                    if (padding > 0) {
+                        printf("%*c", padding, ' ');
+                        length += padding;
+                    }
+
                     printf(" -- ");
                     args__completion_print_escaped(i->description, "");
                     length += 4 + strlen(i->description);
@@ -836,6 +836,19 @@ static void args__zsh_complete(Args *a) {
     printf("*:file:_files\n");
 }
 
+static void args__completion_print_escaped_fish(const char *string) {
+    ARGS__ASSERT(string != NULL);
+    for (const char *c = string; *c != '\0'; c++) {
+        if (*c == '\n') {
+            printf(" ");
+        } else {
+            if (*c == '\'' || *c == '\\') printf("\\\\\\");
+            if (strchr(" $\"", *c) != NULL) printf("\\");
+            printf("%c", *c);
+        }
+    }
+}
+
 static void args__fish_complete(Args *a) {
     ARGS__ASSERT(a != NULL);
     for (Args__Option *i = a->head; i != NULL; i = i->next) {
@@ -844,7 +857,7 @@ static void args__fish_complete(Args *a) {
             printf(" -a '");
             for (size_t j = 0; j < i->as.enum_.length; j++) {
                 if (j > 0) printf(" ");
-                args__completion_print_escaped(i->as.enum_.values[j], " \"$()");
+                args__completion_print_escaped_fish(i->as.enum_.values[j]);
             }
             printf("'");
         }
@@ -853,9 +866,9 @@ static void args__fish_complete(Args *a) {
             printf(" -s %c -r", i->short_name);
         }
         if (i->description != NULL) {
-            printf(" -d \"");
-            args__completion_print_escaped(i->description, "\"$");
-            printf("\"");
+            printf(" -d '");
+            args__completion_print_escaped(i->description, "'");
+            printf("'");
         }
         printf("\n");
     }

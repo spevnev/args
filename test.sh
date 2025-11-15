@@ -44,6 +44,8 @@ for file in $(find $SRC_DIR -type f); do
 
     if [ $? -ne 0 ]; then
         echo -e $RED"[FAILED] $name: non-zero exit code"$RESET
+        echo -e $BLUE"Output:"$RESET
+        echo "$output"
         ((failed += 1))
     elif ! [ "$(echo "$output" | tr -d '\r')" = "$expected_output" ]; then
         echo -e $RED"[FAILED] $name: wrong output"$RESET
