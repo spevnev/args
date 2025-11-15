@@ -1435,6 +1435,13 @@ private:
         instance->help_callback(*instance, program_name);
     }
 
+    void build_options() {
+        for (const auto &option : options) {
+            option->build();
+            option->is_built = true;
+        }
+    }
+
 public:
     class OptionLong : public ValueOption<long, OptionLong> {
     private:
@@ -1638,11 +1645,14 @@ public:
     }
 
     // See `::parse_args`.
+    int parse_args(int argc, char **argv) {
+        build_options();
+        return ::parse_args(args.get(), argc, argv, nullptr);
+    }
+
+    // See `::parse_args`.
     int parse_args(int argc, char **argv, char **&positional_args) {
-        for (const auto &option : options) {
-            option->build();
-            option->is_built = true;
-        }
+        build_options();
         return ::parse_args(args.get(), argc, argv, &positional_args);
     }
 
