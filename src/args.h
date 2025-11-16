@@ -1353,13 +1353,13 @@ private:
         BaseOption(BaseOption &&) = delete;
         BaseOption &operator=(BaseOption &&) = delete;
 
-        R &short_name(char short_name = '\0') {
+        R &short_name(char short_name) {
             m_short_name = short_name;
             return static_cast<R &>(*this);
         }
 
-        R &hidden(bool hidden = true) {
-            m_hidden = hidden;
+        R &hidden() {
+            m_hidden = true;
             return static_cast<R &>(*this);
         }
 
@@ -1389,8 +1389,8 @@ private:
     template <typename T, typename R>
     class ValueOption : public BaseOption<T, R> {
     public:
-        R &required(bool required = true) {
-            m_required = required;
+        R &required() {
+            m_required = true;
             return static_cast<R &>(*this);
         }
 
@@ -1505,8 +1505,8 @@ public:
 
     class OptionFlag : public BaseOption<bool, OptionFlag> {
     public:
-        OptionFlag &early_exit(bool early_exit = true) {
-            m_early_exit = early_exit;
+        OptionFlag &early_exit() {
+            m_early_exit = true;
             return *this;
         }
 
