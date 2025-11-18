@@ -19,6 +19,7 @@ int main(int argc, char **argv) {
     (void) !option_path(&a, "path", "A path option", .short_name = 'p');
     (void) !option_enum(&a, "enum-idx", "An index enum option", ENUM_VALUES);
     (void) !option_enum_string(&a, "enum-str", "A string enum option", ENUM_VALUES, .short_name = 'e');
+    (void) !option_flag(&a, "hidden", NULL, .hidden = true);
 
     parse_args(&a, argc, argv, NULL);
     return EXIT_FAILURE;

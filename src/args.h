@@ -681,6 +681,7 @@ static void args__bash_complete(Args *a, const char *prev, const char *cur, cons
 
         int matches = 0;
         for (Args__Option *i = a->head; i != NULL; i = i->next) {
+            if (i->is_hidden) i->is_matching = false;
             if (i->is_matching) matches++;
         }
 
@@ -822,6 +823,7 @@ static void args__zsh_print_option_details(Args__Option *option) {
 static void args__zsh_complete(Args *a) {
     ARGS__ASSERT(a != NULL);
     for (Args__Option *i = a->head; i != NULL; i = i->next) {
+        if (i->is_hidden) continue;
         if (i->short_name != '\0') {
             printf("(-%c --%s)-%c", i->short_name, i->long_name, i->short_name);
             args__zsh_print_option_details(i);
@@ -852,6 +854,7 @@ static void args__completion_print_escaped_fish(const char *string) {
 static void args__fish_complete(Args *a) {
     ARGS__ASSERT(a != NULL);
     for (Args__Option *i = a->head; i != NULL; i = i->next) {
+        if (i->is_hidden) continue;
         printf("-l %s -%c", i->long_name, i->type == ARGS__TYPE_PATH ? 'F' : 'f');
         if (i->type == ARGS__TYPE_ENUM_INDEX || i->type == ARGS__TYPE_ENUM_STRING) {
             printf(" -a '");
