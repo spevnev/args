@@ -1485,6 +1485,11 @@ public:
     };
 
     class OptionString : public ValueOption<const char *, OptionString> {
+    public:
+        std::string string() const { return std::string{value()}; }
+
+        operator std::string() const { return string(); }
+
     private:
         friend ArgsCpp;
 
@@ -1539,6 +1544,11 @@ public:
     };
 
     class OptionEnumString : public EnumOption<const char *, OptionEnumString> {
+    public:
+        std::string string() const { return std::string{value()}; }
+
+        operator std::string() const { return string(); }
+
     private:
         using EnumOption::EnumOption;
 
