@@ -27,15 +27,14 @@ static void print_help(Args *a, const char *program_name) {
     printf("\n");
     printf("Usage:\n");
     printf("  %s [options]\n", program_name);
-    // Shell completions can either be left hidden and generated on install,
-    // or be exposed to user by printing it in usage and/or documentation.
+    // Document shell completion to allow users to install them manually.
     printf("  %s completion <bash|zsh|fish>\n", program_name);
     printf("\n");
     print_options(a, stdout);
 }
 
 int main(int argc, char **argv) {
-    // Zero-initialize library state.
+    // Initialize library.
     Args a = {0};
 
     // Help flag calls the provided callback and exits.
@@ -44,10 +43,6 @@ int main(int argc, char **argv) {
     option_version(&a, VERSION);
 
     // Define options.
-    // All options take: Args*, long name, description, and zero or more named arguments.
-    // Named arguments are set through designated initializer: `.name1 = value1, .name2 = value2`,
-    // with default value 0 / '\0' / false / NULL depending on the type.
-    // Named arguments: short_name, required, hidden, default_value.
     const long *long_ = option_long(&a, "long", "A long option", .default_value = 5, .short_name = 'l');
     const float *float_ = option_float(&a, "float", "A float option", .short_name = 'f', .required = true);
     const char **string = option_string(
@@ -60,19 +55,16 @@ int main(int argc, char **argv) {
     const char **path = option_path(&a, "path", "A path option");
 
     // Declare a hidden command-like option, e.g. for dumping system info for bug report.
-    // Option with `early_exit` causes `parse_args` to exit early if the option is found,
-    // skips parsing and validation of other options, their values remain default.
-    // Should be handled right after `parse_args`.
-    // Can also be used for handling help and version.
+    // Set `early_exit` to skip validation of other options (since they are ignored anyway).
     const bool *dump = option_flag(&a, "dump", NULL, .hidden = true, .early_exit = true);
 
-    // If enum is continuous and array matches it, result of `option_enum` can be converted directly.
+    // If enum is continuous and array matches it, result of `option_enum` can be casted directly.
     typedef enum { FIRST, SECOND, THIRD } Enum;
     const char *enum_values[] = {"first", "second", "third", NULL};
     const Enum *enum_ = (const Enum *)
         option_enum(&a, "enum", "An enum option", enum_values, .short_name = 'e', .default_value = FIRST);
     // If values don't match, or the enum isn't continuous, it may be desirable to get a string instead.
-    // Also, if values array are defined in the arguments, it must be wrapped in parenthesis.
+    // Values are defined in the arguments, they must be wrapped in parenthesis.
     const char **enum_string = option_enum_string(
         &a,
         "enum-str",
@@ -82,14 +74,12 @@ int main(int argc, char **argv) {
     );
 
     // Parse arguments. Sets option values and returns positional arguments.
-    // Handles shell completion by printing to stdout and exiting.
-    // Exits on error: invalid option value, missing required option, unknown option, etc.
-    // Must be called before side effects or stdout output.
     char **pos_args;
     int pos_args_len = parse_args(&a, argc, argv, &pos_args);
 
+    // Immediately handle flag with `early_exit`.
     if (*dump) {
-        printf("--dump is set.\n");
+        printf("--dump is set!\n");
         free_args(&a);
         return EXIT_SUCCESS;
     }
@@ -140,81 +130,78 @@ int main(int argc, char **argv) {
 
 static const char *VERSION = "v1.3.0";
 
-static void print_help(ArgsCpp &a, const char *program_name) {
+static void print_help(ArgsCpp &args, const char *program_name) {
     // Print description and usage, then call `print_options`.
-    printf("%s - Example of using 'args' library\n", program_name);
+    printf("%s - Example of using 'args' library in C++\n", program_name);
     printf("\n");
     printf("Usage:\n");
     printf("  %s [options]\n", program_name);
-    // Shell completions can either be left hidden and generated on install,
-    // or be exposed to user by printing it in usage and/or documentation.
+    // Document shell completion to allow users to install them manually.
     printf("  %s completion <bash|zsh|fish>\n", program_name);
     printf("\n");
-    a.print_options();
+    args.print_options();
 }
 
 int main(int argc, char **argv) {
+    // Initialize library.
     ArgsCpp args;
 
-    // Help flag calls the provided callback (can be lambda) and exits.
+    // Help flag calls the provided callback and exits.
     args.option_help(print_help);
     // Version flag prints the provided string and exits.
     args.option_version(VERSION);
 
     // Define options.
-    // Option methods return a reference to option, which provides builder-style API
-    // for additional configuration, such as short_name, default_value, required.
-    // Options should be stored by reference as values will be set by `parse_args`.
-    // Accessing values before will result in error.
-    const auto &long_ = args.option_long("long", "A long option").short_name('l').default_value(5);
+    const auto &long_ = args.option_long("long", "A long option").default_value(5).short_name('l');
     const auto &float_ = args.option_float("float", "A float option").short_name('f').required();
     const auto &string = args.option_string("str", "A string option").short_name('s').default_value("string default");
-    const auto &path = args.option_path("path", "A path option").short_name('p');
+    const auto &path = args.option_path("path", "A path option");
 
     // Declare a hidden command-like option, e.g. for dumping system info for bug report.
-    // Option with `early_exit` causes `parse_args` to exit early if the option is found,
-    // skips parsing and validation of other options, their values remain default.
-    // Should be handled right after `parse_args`.
-    // Can also be used for handling help and version.
-    const auto &dump = args.option_flag("dump", NULL).hidden().early_exit();
+    // Set `early_exit` to skip validation of other options (since they are ignored anyway).
+    const auto &dump = args.option_flag("dump", nullptr).hidden().early_exit();
 
-    const char *enum_values[] = {"first", "sed", "third", nullptr};
-    const auto &e = args.option_enum("enum", "An enum option", enum_values).short_name('e').default_value(0);
-    const auto &es = args.option_enum_string("enum-str", "A string enum option", enum_values).default_value("default");
+    // If enum is continuous and array matches it, result of `option_enum` can be casted directly.
+    typedef enum { FIRST, SECOND, THIRD } Enum;
+    const char *enum_one[] = {"first", "second", "third", NULL};
+    const auto &enum_ = args.option_enum("enum", "An enum option", enum_one).short_name('e').default_value(FIRST);
+    // If values don't match, or the enum isn't continuous, it may be desirable to get a string instead.
+    // Values are defined in the arguments, they must be wrapped in parenthesis.
+    const char *enum_two[] = {"other", "enum", "values", NULL};
+    const auto &enum_string = args.option_enum_string("enum-str", "A string enum option", enum_two)
+                                  .default_value("default");
 
     // Parse arguments. Sets option values and returns positional arguments.
-    // Handles shell completion by printing to stdout and exiting.
-    // Exits on error: invalid option value, missing required option, unknown option, etc.
-    // Must be called before side effects or stdout output.
     char **pos_args;
     int pos_args_len = args.parse_args(argc, argv, pos_args);
 
+    // Immediately handle flag with `early_exit`.
     if (dump) {
-        printf("--dump is set.\n");
+        printf("--dump is set!\n");
         return EXIT_SUCCESS;
     }
 
     // Print help on subcommand.
     if (pos_args_len == 1 && strcmp(pos_args[0], "help") == 0) {
-        // print_help(args, argv[0]);
+        print_help(args, argv[0]);
         return EXIT_SUCCESS;
     }
 
     // Print version on subcommand.
     if (pos_args_len == 1 && strcmp(pos_args[0], "version") == 0) {
-        printf("v1.3.0\n");
+        printf("%s\n", VERSION);
         return EXIT_SUCCESS;
     }
 
-    // Values can be accessed using implicit conversion or `.value()`.
+    // Use option values.
     printf(
-        "options: l=%ld f=%f s=\"%s\" p=\"%s\" e=%ld E=\"%s\"\n",
+        "options: l=%ld f=%f s=\"%s\" p=\"%s\" e=%lu E=\"%s\"\n",
         long_.value(),
         float_.value(),
         string.value(),
         path.value(),
-        e.value(),
-        es.value()
+        enum_.value(),
+        enum_string.value()
     );
 
     // Handle positional arguments.
