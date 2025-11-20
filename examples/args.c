@@ -25,7 +25,7 @@ int main(int argc, char **argv) {
     option_version(&a, VERSION);
 
     // Define options.
-    // All options take: args*, long name, description, and zero or more named arguments.
+    // All options take: Args*, long name, description, and zero or more named arguments.
     // Named arguments are set through designated initializer: `.name1 = value1, .name2 = value2`,
     // with default value 0 / '\0' / false / NULL depending on the type.
     // Named arguments: short_name, required, hidden, default_value.

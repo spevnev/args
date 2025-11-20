@@ -1,8 +1,16 @@
 # args
 
-*args* is a simple single-header library for parsing command-line arguments in C/C++.
+*args* is a simple single-header C/C++ library for parsing command-line arguments with shell completion.
 
-## Example & Usage
+## Requirements
+
+- C99 or C++11
+- Tested on Linux, macOS, and Windows
+
+## Examples
+
+These examples aim to quickly show all the features with brief explanations. \
+The complete documentation can be found at the top of the header file.
 
 <details>
     <summary>C</summary>
@@ -21,35 +29,6 @@
 !examples/args_cpp.cc
 ```
 </details>
-
-## Shell completion
-
-Supported shells: bash, zsh, fish.
-
-Completion options are generated *dynamically* by the executable which means:
-1. Completion scripts do *not* need to be updated or reinstalled.
-2. Executable *must* be in the PATH for completion to work.
-
-Completions scripts should be installed through the build system, package manager, or explicitly by user. \
-For system-wide installation:
-
-```shell
-PROGRAM_NAME completion bash > /usr/share/bash-completion/completions/PROGRAM_NAME
-PROGRAM_NAME completion zsh > /usr/share/zsh/site-functions/_PROGRAM_NAME
-PROGRAM_NAME completion fish > /usr/share/fish/vendor_completions.d/PROGRAM_NAME.fish
-```
-
-## Library options
-
-| option                        | description                                                      | default     |
-|-------------------------------|------------------------------------------------------------------|-------------|
-| `ARGS_DISABLE_COMPLETION`     | Disable shell completion                                         | not defined |
-| `ARGS_SKIP_UNKNOWN`           | Skip unknown options, otherwise it is an error                   | not defined |
-| `ARGS_ALLOW_OVERWRITING`      | Allow overwriting option, otherwise it is an error               | not defined |
-| `ARGS_PADDING`                | The number of spaces between the option name and its description | 2           |
-| `ARGS_LINE_LENGTH`            | Line length                                                      | 80          |
-| `ARGS_MIN_DESCRIPTION_LENGTH` | Minimum length of the description line, ignoring the line length | 30          |
-| `ARGS_HIDE_DEFAULTS`          | Hides default values when printing options                       | not defined |
 
 ## Contributing
 

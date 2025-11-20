@@ -1,27 +1,277 @@
-// args v1.3.0
-// Documentation, examples, and issues: https://github.com/spevnev/args
+/*
+MIT License
 
-// MIT License
-//
-// Copyright (c) 2025 Serhii Pievniev
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.
+Copyright (c) 2025 Serhii Pievniev
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+
+// clang-format off
+/*
+=======================================================================================================================
+                                                    DOCUMENTATION
+=======================================================================================================================
+
+args v1.3.0 - Command-line argument parser for C/C++
+Github: https://github.com/spevnev/args
+
+1. Introduction
+===============
+
+args is a simple single-header library for parsing command-line arguments in C/C++.
+To use the library, simply include "args.h" in the file with the main function.
+Note that the header must be included only once.
+
+1.1 Requirements
+----------------
+
+- C99 or C++11
+- Tested on Linux, macOS, and Windows
+
+1.2 C++ usage
+-------------
+
+The documentation is written for C, and the C++ API is almost identical except:
+- `Args` become `ArgsCpp`, functions become methods
+- Freeing is no longer needed
+- Options return a reference to an object containing the value
+- Named arguments become builder-style methods
+
+1.3 Quick start
+---------------
+
+This is a basic example of library usage. See the repository for more examples.
+
+    ```
+    #include "args.h"
+
+    int main(int argc, char **argv) {
+        // Initialize library.
+        Args a = {0};
+
+        // Define options.
+        const long *num = option_long(&a, "long", "A long option", .default_value = 5);
+        const char **str = option_string(&a, "string", "A string option", .required = true);
+
+        // Parse arguments.
+        char **positional_args;
+        int positional_args_length = parse_args(&a, argc, argv, &positional_args);
+
+        // Handle the positional arguments.
+        printf("Positional arguments:");
+        for (int i = 0; i < positional_args_length; i++) printf(" %s", positional_args[i]);
+        printf("\n");
+
+        // Use option values.
+        printf("num=%ld str=%s\n", *num, *str);
+
+        // Free library.
+        free_args(&a);
+        return EXIT_SUCCESS;
+    }
+    ```
+
+
+2. Error handling
+=================
+
+The library handles errors by printing to stderr and exiting immediately.
+This prioritizes API simplicity over error recovery by guaranteeing that all
+library functions return valid results or do not return.
+
+As such, argument parsing should happen at the beginning of the program, and
+everything requiring proper error recovery should be placed after.
+
+
+3. Library state
+================
+
+To initialize the library, create a zero-initialized variable of type `Args`.
+It stores the entire library state and must be passed by pointer as the first
+argument to every library function.
+At the end, all allocated memory must be freed using `free_args`.
+
+The library can be configured through `#define`s before the include as follows:
+
+    ```
+    #define ARGS_DISABLE_COMPLETION
+    #define ARGS_PADDING 4
+    #include "args.h"
+    ```
+
+Table of options:
+
+| Option                      | Description                                                  | Default     |
+|-----------------------------|--------------------------------------------------------------|-------------|
+| ARGS_DISABLE_COMPLETION     | Disable shell completion                                     | not defined |
+| ARGS_ALLOW_OVERWRITING      | Allow overwriting option instead of exiting with an error    | not defined |
+| ARGS_PADDING                | Number of spaces between the option name and its description | 2           |
+| ARGS_LINE_LENGTH            | Line length                                                  | 80          |
+| ARGS_MIN_DESCRIPTION_LENGTH | Minimum description length regardless of `ARGS_LINE_LENGTH`  | 30          |
+| ARGS_HIDE_DEFAULTS          | Hide default values in `print_options`                       | not defined |
+
+
+4. Options
+==========
+
+Options are defined using functions of the form `option_TYPE`, which return a
+non-NULL pointer to the value that will be set after parsing the arguments.
+
+Option types: long, float, string, path, flag, enum, enum_string.
+
+These functions accept `long_name`, `description` and optional named arguments.
+`long_name` is a non-NULL string consisting of alphanumerics and '-', '+', '_'.
+`description` is a string of printable ASCII characters, or NULL.
+
+Named arguments use designated initializers (i.e. `.name = value`) to provide a
+convenient way of specifying multiple optional arguments:
+
+    ```
+    option_long(&a, "long1", "description");
+    option_long(&a, "long2", "description", .required = true);
+    option_long(&a, "long3", "description", .short_name = 'l', .default_value = 123);
+    ```
+
+Enum options also require `values`, a NULL-terminated array of strings:
+
+    ```
+    option_enum(&a, "enum", "description", ((const char *[]) {"some", "enum", "values", NULL}));
+    option_enum_string(&a, "enum-str", "description", ((const char *[]) {"other", "enum", "values", NULL}));
+    ```
+
+Table of named arguments:
+
+| Argument      | Type        | Description                                                        | Default   | Option types    |
+|---------------|-------------|--------------------------------------------------------------------|-----------|-----------------|
+| short_name    | char        | Short name (e.g. `-s`). An alphanumeric char, or '\0' for none.    | '\0'      | All             |
+| hidden        | bool        | Hide in `print_options`, don't provide shell completions.          | false     | All             |
+|               |             | Intended for deprecated or experimental options.                   |           |                 |
+| required      | bool        | Require option value to be set. When a required option is missing  | false     | All except flag |
+|               |             | `parse_args` will print an error message to stderr and exit.       |           |                 |
+| default_value | option type | Default option value. No effect on required options.               | 0 or NULL | All except flag |
+| early_exit    | bool        | If set, `parse_args` will exit as soon as the option is found.     | false     | flag            |
+|               |             | If found, the other options are not validated or set. It must be   |           |                 |
+|               |             | handled before accessing other options, intended for command-like  |           |                 |
+|               |             | flags that ignore required/invalid options, e.g. help and version. |           |                 |
+
+
+5. Parsing arguments
+====================
+
+After options are defined, the arguments can be parsed using `parse_args`.
+It takes `argc`, `argv`, and NULL-able pointer to `char** positional_args`.
+Returns the number of positional arguments and sets `positional_args` to the
+array of strings from `argv`, if it isn't NULL.
+
+The function parses the arguments, validates the options and sets their values.
+In case of an error, such as an unknown option or invalid value type, it prints
+an error message to stderr and exits.
+
+The following option syntaxes are supported:
+--long value
+--long=value
+-s value
+-svalue
+Additionally, short options can be stacked when all preceding ones are flags:
+-abcvalue <=> -a -b -c value
+
+5.1 Shell completion
+--------------------
+
+The library provides shell completion for bash, zsh, and fish.
+
+Suggestions are generated dynamically, which has two implications:
+1. The completion scripts don't need to be updated.
+2. The executable must be in the user's PATH.
+
+Completion is implemented by handling predefined commands in `parse_args`:
+`completion <bash|zsh|fish>` prints a completion script and exits.
+`__complete`, used by the completion script, prints suggestions and exits.
+
+Since scripts and suggestions are printed to stdout, there must be no other
+output prior to calling `parse_args`.
+
+The scripts should be installed via a build system or package manager.
+Additionally, the `completion` command can be documented in the help message
+to allow manual installation.
+
+Commands for system-wide installation (requires root):
+
+    ```
+    PROGRAM_NAME completion bash > /usr/share/bash-completion/completions/PROGRAM_NAME
+    PROGRAM_NAME completion zsh > /usr/share/zsh/site-functions/_PROGRAM_NAME
+    PROGRAM_NAME completion fish > /usr/share/fish/vendor_completions.d/PROGRAM_NAME.fish
+    ```
+
+
+6. Printing help
+================
+
+The library provides `print_options`, which prints the following information:
+- short name, if defined
+- long name
+- description, word-wrapped and split on `\n`
+- default value, if not required
+
+For example, here's `print_options` output for the following options:
+
+    ```
+    option_long(&a, "long", "A long option", .default_value = 5, .short_name = 'l');
+    option_float(&a, "float", "A float option", .required = true);
+    option_string(&a, "str", "A string option", .short_name = 's', .default_value = "string default");
+    option_path(&a, "path", "A path option");
+    ```
+    ```
+    Options:
+      -l, --long      A long option (default: 5)
+          --float     A float option
+      -s, --str       A string option (default: "string default")
+          --path      A path option (default: none)
+    ```
+
+The rest of the help message (e.g. title, program description, usage) must be
+printed by the user.
+
+Help and version flags can be either handled manually using `option_flag` or
+through the convenience wrappers:
+`option_help` calls the provided callback when `-h` or `--help` is set.
+`option_version` prints the provided string when `-v` or `--version` is set.
+
+    ```
+    static void print_help(Args *a, const char *program_name) {
+        printf("%s - Example of using 'args' library\n", program_name);
+        printf("\n");
+        printf("Usage:\n");
+        printf("  %s [options]\n", program_name);
+        printf("  %s some_command <arg1|arg2>\n", program_name);
+        printf("\n");
+        print_options(a, stdout);
+    }
+
+    int main(int argc, char **argv) {
+        Args a = {0};
+        option_help(&a, print_help);
+        ...
+    }
+    ```
+*/
+// clang-format on
 
 // ====================================================================================================================
 //                                                  IMPLEMENTATION
@@ -101,8 +351,6 @@ typedef struct Args__Option {
 
 typedef struct Args Args;
 
-typedef void (*Args__HelpCallback)(Args *, const char *);
-
 struct Args {
     Args__Option *head;
     Args__Option *tail;
@@ -110,7 +358,7 @@ struct Args {
     bool are_parsed;
     bool options_have_short_name;
     size_t options_max_name_length;
-    Args__HelpCallback help_callback;
+    void (*help_callback)(Args *, const char *);
     char *version_string;
 };
 
@@ -368,10 +616,8 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const char **args__option_str
 
 typedef struct {
     ARGS__OPTION_COMMON_FIELDS
-    // If set, parse_args will exit as soon as this option is found.
-    // Skips parsing and validation of other options, their values stay default.
-    // Must be handled right after `parse_args`, before using other options.
-    // Used for handling command-like options, e.g. help, version.
+    // Make `parse_args` exit as soon as the option is found.
+    // If found, skips validation and parsing of all other options.
     bool early_exit;
 } Args__OptionFlagArgs;
 
@@ -939,12 +1185,10 @@ static void free_args(Args *a) {
     free(a->version_string);
 }
 
-// Parses arguments, sets option-returned values.
-// Unless disabled, handles shell completion by writing to stdout and exiting.
-// Must be called before side effects or stdout output.
+// Parses the arguments and sets option values.
+// Handles shell completions, must be called before printing to stdout.
 // Returns positional arguments via `positional_args`, and their count as return value.
-// Elements are from `argv`, while the array memory is managed by library.
-// On error, prints to stderr and exits.
+// Elements are from `argv`. The array memory is managed by the library.
 static int parse_args(Args *a, int argc, char **argv, char ***positional_args) {
     ARGS__ASSERT(a != NULL && argv != NULL);
     a->are_parsed = true;
@@ -1123,8 +1367,6 @@ static int parse_args(Args *a, int argc, char **argv, char ***positional_args) {
     return positional_args_index;
 }
 
-// Prints all options to `fp`.
-// Caller is responsible for printing usage, as well as `completion` command.
 ARGS__MAYBE_UNUSED static void print_options(Args *a, FILE *fp) {
     ARGS__ASSERT(a != NULL && fp != NULL);
 
@@ -1219,11 +1461,9 @@ ARGS__MAYBE_UNUSED static void print_options(Args *a, FILE *fp) {
     }
 }
 
-// Defines a help option.
-// On "-h" or "--help", calls `help_callback(args*, program_name)` and exits.
+// On "-h" or "--help", calls the provided callback and exits.
 // Help flag is checked before validating other options.
-// For a different behavior, help can be handled manually using `option_flag`.
-ARGS__MAYBE_UNUSED static void option_help(Args *a, Args__HelpCallback help_callback) {
+ARGS__MAYBE_UNUSED static void option_help(Args *a, void (*help_callback)(Args *a, const char *program_name)) {
     ARGS__ASSERT(a != NULL && help_callback != NULL);
     if (a->are_parsed) ARGS__FATAL("New options cannot be added after parsing the arguments");
     a->help_callback = help_callback;
@@ -1232,10 +1472,8 @@ ARGS__MAYBE_UNUSED static void option_help(Args *a, Args__HelpCallback help_call
     option->as.bool_.is_help = true;
 }
 
-// Defines a version option.
 // On "-v" or "--version", prints `version_string` to stdout and exits.
 // Version flag is checked before validating other options.
-// For a different behavior, version can be handled manually using `option_flag`.
 ARGS__MAYBE_UNUSED static void option_version(Args *a, const char *version_string) {
     ARGS__ASSERT(a != NULL && version_string != NULL);
     if (a->are_parsed) ARGS__FATAL("New options cannot be added after parsing the arguments");
@@ -1248,7 +1486,6 @@ ARGS__MAYBE_UNUSED static void option_version(Args *a, const char *version_strin
 #ifndef __cplusplus
 
 // Defines a long option, returns a pointer set by `parse_args`.
-// Exits if `a` or `long_name` is NULL, or out of memory.
 #define option_long(a, long_name, ...)                                 \
     args__option_long(                                                 \
         ARGS__ZERO_OR_DESIGNATED(Args__OptionLongArgs, __VA_ARGS__) a, \
@@ -1257,7 +1494,6 @@ ARGS__MAYBE_UNUSED static void option_version(Args *a, const char *version_strin
     )
 
 // Defines a float option, returns a pointer set by `parse_args`.
-// Exits if `a` or `long_name` is NULL, or out of memory.
 #define option_float(a, long_name, ...)                                 \
     args__option_float(                                                 \
         ARGS__ZERO_OR_DESIGNATED(Args__OptionFloatArgs, __VA_ARGS__) a, \
@@ -1266,9 +1502,8 @@ ARGS__MAYBE_UNUSED static void option_version(Args *a, const char *version_strin
     )
 
 // Defines a string option, returns a pointer set by `parse_args`.
-// String memory is owned by library, freed by `free_args`.
-// Result can be NULL only if default value is NULL.
-// Exits if `a` or `long_name` is NULL, or out of memory.
+// The value is NULL only if the default is NULL and the option is not set.
+// String memory is managed by the library.
 #define option_string(a, long_name, ...)                                                 \
     args__option_string(                                                                 \
         ARGS__ZERO_OR_DESIGNATED(Args__OptionStringArgs, __VA_ARGS__) ARGS__TYPE_STRING, \
@@ -1277,8 +1512,8 @@ ARGS__MAYBE_UNUSED static void option_version(Args *a, const char *version_strin
         ARGS__GET_FIRST(__VA_ARGS__)                                                     \
     )
 
-// Same as `option_string` except that shell completion will suggest paths.
-// Does NOT check that the value is a path.
+// Same as `option_string` except that shell completion suggests paths.
+// Does NOT check that the value is a valid path.
 #define option_path(a, long_name, ...)                                                 \
     args__option_string(                                                               \
         ARGS__ZERO_OR_DESIGNATED(Args__OptionStringArgs, __VA_ARGS__) ARGS__TYPE_PATH, \
@@ -1287,9 +1522,7 @@ ARGS__MAYBE_UNUSED static void option_version(Args *a, const char *version_strin
         ARGS__GET_FIRST(__VA_ARGS__)                                                   \
     )
 
-// Defines a boolean flag, returns a pointer set by `parse_args`.
-// It is always not required, and defaults to false.
-// Exits if `a` or `long_name` is NULL, or out of memory.
+// Defines a flag, returns a pointer set by `parse_args`.
 #define option_flag(a, long_name, ...)                                 \
     args__option_flag(                                                 \
         ARGS__ZERO_OR_DESIGNATED(Args__OptionFlagArgs, __VA_ARGS__) a, \
@@ -1298,10 +1531,10 @@ ARGS__MAYBE_UNUSED static void option_version(Args *a, const char *version_strin
     )
 
 // Defines an enum option, returns a pointer set by `parse_args`.
-// Result is either a valid index or a default value.
-// `values` must be a NULL-terminated array, matched case-insensitively.
-// When `values` array is defined in arguments, it must be wrapped in parenthesis.
-// Exits if `a`, `long_name`, or `values` is NULL, or out of memory.
+// The value is either a valid index or the default value.
+// `values` must be a NULL-terminated array.
+// `values` are matched case-insensitively.
+// If `values` are defined in the arguments, they must be wrapped in parenthesis.
 #define option_enum(a, long_name, description, ...)                    \
     args__option_enum(                                                 \
         ARGS__ZERO_OR_DESIGNATED(Args__OptionEnumArgs, __VA_ARGS__) a, \
@@ -1310,12 +1543,9 @@ ARGS__MAYBE_UNUSED static void option_version(Args *a, const char *version_strin
         ARGS__GET_FIRST(__VA_ARGS__)                                   \
     )
 
-// Defines an enum option, returns a pointer set by `parse_args`.
-// Result is either a string from `values` or a default value.
-// String and array memory is owned by library, freed by `free_args`.
-// `values` must be a NULL-terminated array, matched case-insensitively.
-// When `values` array is defined in arguments, it must be wrapped in parenthesis.
-// Exits if `a`, `long_name`, or `values` is NULL, or out of memory.
+// Same as `option_enum` except that the value is either a string from `values`
+// or the default value.
+// String memory is managed by the library.
 #define option_enum_string(a, long_name, description, ...)                   \
     args__option_enum_string(                                                \
         ARGS__ZERO_OR_DESIGNATED(Args__OptionEnumStringArgs, __VA_ARGS__) a, \
@@ -1431,11 +1661,9 @@ private:
             : ValueOption<T, R>(args, long_name, description), values(values) {}
     };
 
-    using HelpCallback = std::function<void(ArgsCpp &, const char *s)>;
-
     std::shared_ptr<Args> args;
     std::vector<std::unique_ptr<Buildable> > options{};
-    HelpCallback help_callback{nullptr};
+    std::function<void(ArgsCpp &, const char *)> help_callback{nullptr};
 
     static ArgsCpp *instance;
 
@@ -1513,6 +1741,8 @@ public:
 
     class OptionFlag : public BaseOption<bool, OptionFlag> {
     public:
+        // Make `parse_args` exit as soon as the option is found.
+        // If found, skips validation and parsing of all other options.
         OptionFlag &early_exit() {
             m_early_exit = true;
             return *this;
@@ -1574,75 +1804,58 @@ public:
     ArgsCpp(ArgsCpp &&) = default;
     ArgsCpp &operator=(ArgsCpp &&) = default;
 
-    // See `::option_help`.
-    void option_help(HelpCallback help_callback) {
+    // On "-h" or "--help", calls the callback (can be lambda) and exits.
+    // Help flag is checked before validating other options.
+    void option_help(std::function<void(ArgsCpp &args, const char *program_name)> help_callback) {
         this->help_callback = help_callback;
         ::option_help(args.get(), callback_bridge);
     }
 
-    // See `::option_version`.
+    // On "-v" or "--version", prints `version_string` to stdout and exits.
+    // Version flag is checked before validating other options.
     void option_version(const char *version_string) { ::option_version(args.get(), version_string); }
 
-    // Returns a reference to a long option.
-    // Provides builder-style API for additional configuration.
-    // The option is built and its value is set by `parse_args`.
-    // Value is accessed through implicit conversion or `.value()`.
-    // `long_name` must not be nullptr.
+    // Returns a reference to a long option, the value is set by `parse_args`.
     ARGS__WARN_UNUSED_RESULT OptionLong &option_long(const char *long_name, const char *description) {
         auto *option = new OptionLong(args, long_name, description);
         options.emplace_back(option);
         return *option;
     }
 
-    // Returns a reference to a float option.
-    // Provides builder-style API for additional configuration.
-    // The option is built and its value is set by `parse_args`.
-    // Value is accessed through implicit conversion or `.value()`.
-    // `long_name` must not be nullptr.
+    // Returns a reference to a float option, the value is set by `parse_args`.
     ARGS__WARN_UNUSED_RESULT OptionFloat &option_float(const char *long_name, const char *description) {
         auto *option = new OptionFloat(args, long_name, description);
         options.emplace_back(option);
         return *option;
     }
 
-    // Returns a reference to a string option.
-    // Provides builder-style API for additional configuration.
-    // The option is built and its value is set by `parse_args`.
-    // Value is accessed through implicit conversion or `.value()`.
-    // Value can be nullptr only if default is nullptr.
-    // `long_name` must not be nullptr.
+    // Returns a reference to a string option, the value is set by `parse_args`.
+    // The value is nullptr only if the default is nullptr and the option is not set.
     ARGS__WARN_UNUSED_RESULT OptionString &option_string(const char *long_name, const char *description) {
         auto *option = new OptionString(args, long_name, description, ARGS__TYPE_STRING);
         options.emplace_back(option);
         return *option;
     }
 
-    // Same as `option_string` except that shell completion will suggest paths.
-    // Does NOT check that the value is a path.
+    // Same as `option_string` except that shell completion suggests paths.
+    // Does NOT check that the value is a valid path.
     ARGS__WARN_UNUSED_RESULT OptionString &option_path(const char *long_name, const char *description) {
         auto *option = new OptionString(args, long_name, description, ARGS__TYPE_PATH);
         options.emplace_back(option);
         return *option;
     }
 
-    // Returns a reference to a flag option.
-    // Provides builder-style API for additional configuration.
-    // The option is built and its value is set by `parse_args`.
-    // Value is accessed through implicit conversion or `.value()`.
-    // `long_name` must not be nullptr.
+    // Returns a reference to a flag, the value is set by `parse_args`.
     ARGS__WARN_UNUSED_RESULT OptionFlag &option_flag(const char *long_name, const char *description) {
         auto *option = new OptionFlag(args, long_name, description);
         options.emplace_back(option);
         return *option;
     }
 
-    // Returns a reference to an index enum option.
-    // Provides builder-style API for additional configuration.
-    // The option is built and its value is set by `parse_args`.
-    // Value is accessed through implicit conversion or `.value()`.
-    // Value is either a valid index or a default value.
-    // `values` must be a nullptr-terminated array, matched case-insensitively.
-    // `long_name` and `values` must not be nullptr.
+    // Returns a reference to an enum option, the value is set by `parse_args`.
+    // The value is either a valid index or the default value.
+    // `values` must be a nullptr-terminated array.
+    // `values` are matched case-insensitively.
     ARGS__WARN_UNUSED_RESULT OptionEnum &option_enum(
         const char *long_name,
         const char *description,
@@ -1653,13 +1866,8 @@ public:
         return *option;
     }
 
-    // Returns a reference to a string enum option.
-    // Provides builder-style API for additional configuration.
-    // The option is built and its value is set by `parse_args`.
-    // Value is accessed through implicit conversion or `.value()`.
-    // Value can be nullptr only if default is nullptr.
-    // `values` must be a nullptr-terminated array, matched case-insensitively.
-    // `long_name` and `values` must not be nullptr.
+    // Same as `option_enum` except that the value is either a string from
+    // `values` or the default value.
     ARGS__WARN_UNUSED_RESULT OptionEnumString &option_enum_string(
         const char *long_name,
         const char *description,
@@ -1670,19 +1878,21 @@ public:
         return *option;
     }
 
-    // See `::parse_args`.
+    // Parses the arguments and sets option values.
+    // Handles shell completions, must be called before printing to stdout.
     int parse_args(int argc, char **argv) {
         build_options();
         return ::parse_args(args.get(), argc, argv, nullptr);
     }
 
-    // See `::parse_args`.
+    // Parses the arguments and sets option values.
+    // Handles shell completions, must be called before printing to stdout.
+    // Returns positional arguments via `positional_args`, and their count as return value.
     int parse_args(int argc, char **argv, char **&positional_args) {
         build_options();
         return ::parse_args(args.get(), argc, argv, &positional_args);
     }
 
-    // See `::print_options`.
     void print_options(FILE *fp = stdout) { ::print_options(args.get(), fp); }
 };
 
