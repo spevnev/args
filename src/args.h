@@ -616,8 +616,9 @@ ARGS__MAYBE_UNUSED ARGS__WARN_UNUSED_RESULT static const char **args__option_str
 
 typedef struct {
     ARGS__OPTION_COMMON_FIELDS
-    // Make `parse_args` exit as soon as the option is found.
-    // If found, skips validation and parsing of all other options.
+    // Checked before all other options. When present, `parse_args` exits early
+    // without validating other options or setting their values.
+    // As such, it must be handled before accessing other option values.
     bool early_exit;
 } Args__OptionFlagArgs;
 
@@ -1461,7 +1462,7 @@ ARGS__MAYBE_UNUSED static void print_options(Args *a, FILE *fp) {
     }
 }
 
-// On "-h" or "--help", calls the provided callback and exits.
+// On "-h" or "--help", calls `help_callback` and exits.
 // Help flag is checked before validating other options.
 ARGS__MAYBE_UNUSED static void option_help(Args *a, void (*help_callback)(Args *a, const char *program_name)) {
     ARGS__ASSERT(a != NULL && help_callback != NULL);
@@ -1741,8 +1742,9 @@ public:
 
     class OptionFlag : public BaseOption<bool, OptionFlag> {
     public:
-        // Make `parse_args` exit as soon as the option is found.
-        // If found, skips validation and parsing of all other options.
+        // Checked before all other options. When present, `parse_args` exits
+        // early without validating other options or setting their values.
+        // As such, it must be handled before accessing other option values.
         OptionFlag &early_exit() {
             m_early_exit = true;
             return *this;

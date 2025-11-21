@@ -54,8 +54,10 @@ int main(int argc, char **argv) {
     );
     const char **path = option_path(&a, "path", "A path option");
 
-    // Declare a hidden command-like option, e.g. for dumping system info for bug report.
-    // Set `early_exit` to skip validation of other options (since they are ignored anyway).
+    // Declare a hidden command-like option, e.g. dump system info for bug report.
+    // Since handling of this flag (see below) ignores values of other options,
+    // `early_exit` can be set to skip validation of other options when present.
+    // This way, flag works without required options or with invalid options/values.
     const bool *dump = option_flag(&a, "dump", NULL, .hidden = true, .early_exit = true);
 
     // If enum is continuous and array matches it, result of `option_enum` can be casted directly.
@@ -157,8 +159,10 @@ int main(int argc, char **argv) {
     const auto &string = args.option_string("str", "A string option").short_name('s').default_value("string default");
     const auto &path = args.option_path("path", "A path option");
 
-    // Declare a hidden command-like option, e.g. for dumping system info for bug report.
-    // Set `early_exit` to skip validation of other options (since they are ignored anyway).
+    // Declare a hidden command-like option, e.g. dump system info for bug report.
+    // Since handling of this flag (see below) ignores values of other options,
+    // `early_exit` can be set to skip validation of other options when present.
+    // This way, flag works without required options or with invalid options/values.
     const auto &dump = args.option_flag("dump", nullptr).hidden().early_exit();
 
     // If enum is continuous and array matches it, result of `option_enum` can be casted directly.
