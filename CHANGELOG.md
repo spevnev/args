@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## [2.0.0](https://github.com/spevnev/args/releases/tag/v2.0.0)
 
 ### **BREAKING** Changed
 

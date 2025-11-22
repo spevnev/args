@@ -19,7 +19,7 @@ The complete documentation can be found at the top of the header file.
 // examples/args.c
 #include "args.h"
 
-static const char *VERSION = "v1.3.0";
+static const char *VERSION = "v2.0.0";
 
 static void print_help(Args *a, const char *program_name) {
     // Print description and usage, then call `print_options`.
@@ -130,7 +130,7 @@ int main(int argc, char **argv) {
 // examples/args_cpp.cc
 #include "args.h"
 
-static const char *VERSION = "v1.3.0";
+static const char *VERSION = "v2.0.0";
 
 static void print_help(ArgsCpp &args, const char *program_name) {
     // Print description and usage, then call `print_options`.

@@ -28,7 +28,7 @@ SOFTWARE.
                                                     DOCUMENTATION
 =======================================================================================================================
 
-args v1.3.0 - Command-line argument parser for C/C++
+args v2.0.0 - Command-line argument parser for C/C++
 Github: https://github.com/spevnev/args
 
 1. Introduction

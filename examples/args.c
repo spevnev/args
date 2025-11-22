@@ -1,6 +1,6 @@
 #include "args.h"
 
-static const char *VERSION = "v1.3.0";
+static const char *VERSION = "v2.0.0";
 
 static void print_help(Args *a, const char *program_name) {
     // Print description and usage, then call `print_options`.
