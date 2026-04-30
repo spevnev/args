@@ -1,6 +1,6 @@
 # Changelog
 
-## [2.0.0](https://github.com/spevnev/args/releases/tag/v2.0.0)
+## [2.0.0](https://github.com/spievniev/args/releases/tag/v2.0.0)
 
 ### **BREAKING** Changed
 
@@ -21,7 +21,7 @@
 - `hidden` to hide option from `print_options`, intended for deprecated or developer options
 - `early_exit` named argument for `option_flag`, intended for flags like `help` and `version`
 
-## [1.3.0](https://github.com/spevnev/args/releases/tag/v1.3.0)
+## [1.3.0](https://github.com/spievniev/args/releases/tag/v1.3.0)
 
 ### Added
 
@@ -43,7 +43,7 @@
 - Fix `print_options` printing trailing whitespace after option with no default and no description
 - Fix `print_options` printing whitespaces before long option even when no option has a short name
 
-## [1.2.0](https://github.com/spevnev/args/releases/tag/v1.2.0)
+## [1.2.0](https://github.com/spievniev/args/releases/tag/v1.2.0)
 
 ### Added
 
@@ -64,7 +64,7 @@
 - Some tests missing `free_args`
 - Return number of positional arguments from `parse_args` even when `pos_args` is NULL
 
-## [1.1.0](https://github.com/spevnev/args/releases/tag/v1.1.0)
+## [1.1.0](https://github.com/spievniev/args/releases/tag/v1.1.0)
 
 ### Added
 
@@ -83,6 +83,6 @@
 
 - Silence unused function warning
 
-## [1.0.0](https://github.com/spevnev/args/releases/tag/v1.0.0)
+## [1.0.0](https://github.com/spievniev/args/releases/tag/v1.0.0)
 
 Initial release
